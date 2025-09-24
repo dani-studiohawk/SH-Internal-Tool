@@ -35,7 +35,7 @@ export default function SavedIdeas() {
       <div className="flex-between mb-4">
         <div>
           <h1>Saved Ideas</h1>
-          <p className="text-muted">Browse and select from your saved headline ideas</p>
+          <p className="text-muted">Browse and select from your saved ideas</p>
         </div>
         <button onClick={() => router.push('/pr-writing-assistant')} className="secondary">
           ← Back to PR Writer
@@ -47,7 +47,7 @@ export default function SavedIdeas() {
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💡</div>
           <h3>No Saved Ideas Yet</h3>
           <p className="text-muted">
-            Save headlines from the Ideation Assistant to access them here.
+            Save ideas from the Ideation Assistant to access them here.
             <br />
             <button
               onClick={() => router.push('/ideation-assistant')}

@@ -33,13 +33,13 @@ export default async function handler(req, res) {
       ]
     };
 
-    const prompt = `Generate 5 creative headline ideas for a Digital PR campaign based on the following context: ${context}. The campaign type is: ${campaignType}.
+    const prompt = `Generate 5 creative ideas for a Digital PR campaign based on the following context: ${context}. The campaign type is: ${campaignType}.
 
-Here are examples of strong headlines for this campaign type:
+Here are examples of strong ideas for this campaign type:
 ${examples[campaignType].map(ex => `- "${ex}"`).join('\n')}
 
-For each headline, provide:
-- Headline Title
+For each idea, provide:
+- Title (the main idea expressed as a compelling headline)
 - A one-sentence summary of the idea
 ${campaignType === 'Data lead' ? '- Suggested sources for the data (either external or internal)' : ''}
 
@@ -59,9 +59,9 @@ Format the response as a JSON array of objects with keys: title, summary${campai
     });
 
     const responseText = completion.choices[0].message.content;
-    const headlines = JSON.parse(responseText);
+    const ideas = JSON.parse(responseText);
 
-    res.status(200).json({ headlines });
+    res.status(200).json({ ideas });
   } catch (error) {
     console.error('OpenAI API error:', error);
     res.status(500).json({ error: 'Failed to generate headlines' });
