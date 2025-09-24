@@ -13,6 +13,7 @@ export default function PRWritingAssistant() {
   const [mode, setMode] = useState('loading'); // 'loading', 'fresh', 'saved', 'recent'
   const [savedIdeas, setSavedIdeas] = useState([]);
   const [selectedSavedIdea, setSelectedSavedIdea] = useState(null);
+  const [loading, setLoading] = useState(false);
   
   const router = useRouter();
 
@@ -104,13 +105,38 @@ export default function PRWritingAssistant() {
     setDraft(draftText);
   };
 
-  const generateDraft = () => {
-    // This could be enhanced to call OpenAI for full press release generation
-    const storyData = localStorage.getItem('storyData');
-    if (storyData) {
-      const data = JSON.parse(storyData);
-      generateInitialDraft(data);
+  const generateFullPressRelease = async () => {
+    if (!headline || !summary) {
+      alert('Please provide a headline and summary first!');
+      return;
     }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/generate-press-release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headline,
+          summary,
+          clientData,
+          campaignType,
+          sources,
+          currentDate: new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })
+        })
+      });
+
+      const data = await response.json();
+      setDraft(data.pressRelease);
+    } catch (error) {
+      console.error('Error generating press release:', error);
+      alert('Failed to generate press release. Please try again.');
+    }
+    setLoading(false);
   };
 
   return (
@@ -167,8 +193,8 @@ export default function PRWritingAssistant() {
       {/* Press Release Draft */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <h3>Press Release Draft</h3>
-        <button onClick={generateDraft} style={{ marginBottom: '1rem' }}>
-          {draft ? '🔄 Regenerate Draft' : '✨ Generate Draft'}
+        <button onClick={generateFullPressRelease} style={{ marginBottom: '1rem' }} disabled={loading}>
+          {loading ? '🧠 Generating Press Release...' : '✨ Generate Full Press Release'}
         </button>
         <textarea 
           value={draft} 

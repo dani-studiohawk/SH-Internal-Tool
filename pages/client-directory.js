@@ -13,7 +13,8 @@ export default function ClientDirectory() {
     url: '',
     toneOfVoice: '',
     spheres: '',
-    status: 'active'
+    status: 'active',
+    outreachLocations: []
   });
 
   useEffect(() => {
@@ -47,13 +48,14 @@ export default function ClientDirectory() {
       url: '',
       toneOfVoice: '',
       spheres: '',
-      status: 'active'
+      status: 'active',
+      outreachLocations: []
     });
     setShowForm(false);
   };
 
   const editClient = (client) => {
-    setFormData(client);
+    setFormData({ ...client, outreachLocations: client.outreachLocations || [] });
     setEditingClient(client);
     setShowForm(true);
   };
@@ -143,6 +145,54 @@ export default function ClientDirectory() {
             </select>
           </div>
 
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Outreach Locations</label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={formData.outreachLocations.includes('Australia')} 
+                  onChange={e => {
+                    const locs = formData.outreachLocations;
+                    if (e.target.checked) {
+                      setFormData({...formData, outreachLocations: [...locs, 'Australia']});
+                    } else {
+                      setFormData({...formData, outreachLocations: locs.filter(l => l !== 'Australia')});
+                    }
+                  }} 
+                /> Australia
+              </label>
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={formData.outreachLocations.includes('UK')} 
+                  onChange={e => {
+                    const locs = formData.outreachLocations;
+                    if (e.target.checked) {
+                      setFormData({...formData, outreachLocations: [...locs, 'UK']});
+                    } else {
+                      setFormData({...formData, outreachLocations: locs.filter(l => l !== 'UK')});
+                    }
+                  }} 
+                /> UK
+              </label>
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={formData.outreachLocations.includes('United States')} 
+                  onChange={e => {
+                    const locs = formData.outreachLocations;
+                    if (e.target.checked) {
+                      setFormData({...formData, outreachLocations: [...locs, 'United States']});
+                    } else {
+                      setFormData({...formData, outreachLocations: locs.filter(l => l !== 'United States')});
+                    }
+                  }} 
+                /> United States
+              </label>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
             <button type="submit">
               {editingClient ? '💾 Update Client' : '✨ Add Client'}
@@ -152,7 +202,8 @@ export default function ClientDirectory() {
               className="secondary"
               onClick={() => {setShowForm(false); setEditingClient(null); setFormData({
                 name: '', industry: '', leadDPR: '', boilerplate: '', 
-                pressContacts: '', url: '', toneOfVoice: '', spheres: '', status: 'active'
+                pressContacts: '', url: '', toneOfVoice: '', spheres: '', status: 'active',
+                outreachLocations: []
               });}}
             >
               Cancel
@@ -213,6 +264,12 @@ export default function ClientDirectory() {
                   >
                     🔗 Visit Website
                   </a>
+                </p>
+              )}
+
+              {client.outreachLocations && Array.isArray(client.outreachLocations) && client.outreachLocations.length > 0 && (
+                <p className="text-sm text-muted" style={{ marginBottom: '0.5rem' }}>
+                  <strong>Outreach Locations:</strong> {client.outreachLocations.join(', ')}
                 </p>
               )}
 

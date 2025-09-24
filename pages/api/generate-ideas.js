@@ -43,14 +43,17 @@ For each idea, provide:
 - A one-sentence summary of the idea
 ${campaignType === 'Data lead' ? '- Suggested sources for the data (either external or internal)' : ''}
 
-Format the response as a JSON array of objects with keys: title, summary${campaignType === 'Data lead' ? ', sources (array of strings)' : ''}.`;
+IMPORTANT: Respond with ONLY a valid JSON array. Do not include any explanations, markdown formatting, or additional text. The response must be parseable as JSON.
+
+Example format:
+[{"title": "Headline Idea", "summary": "Brief summary of the idea"${campaignType === 'Data lead' ? ', "sources": ["Source 1", "Source 2"]' : ''}}]`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-4o-mini',
       messages: [
         { 
           role: 'system', 
-          content: 'You are a professional PR headline writer specializing in compelling, newsworthy headlines for B2B and B2C campaigns. Focus on headlines that are engaging, specific, and likely to attract media attention.' 
+          content: 'You are a professional PR headline writer specializing in compelling, newsworthy headlines for B2B and B2C campaigns. You must respond with ONLY valid JSON. No explanations, no markdown, just pure JSON.' 
         },
         { role: 'user', content: prompt }
       ],
@@ -59,7 +62,43 @@ Format the response as a JSON array of objects with keys: title, summary${campai
     });
 
     const responseText = completion.choices[0].message.content;
-    const ideas = JSON.parse(responseText);
+    console.log('OpenAI response:', responseText);
+    
+    // Try to parse the JSON response
+    let ideas;
+    try {
+      // First try to parse as-is
+      ideas = JSON.parse(responseText);
+    } catch (parseError) {
+      console.log('Direct JSON parse failed, trying to extract JSON from response...');
+      
+      // Try to extract JSON from markdown code blocks
+      const jsonMatch = responseText.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+      if (jsonMatch) {
+        try {
+          ideas = JSON.parse(jsonMatch[1]);
+          console.log('Successfully extracted JSON from markdown code block');
+        } catch (extractError) {
+          console.error('Failed to parse extracted JSON:', jsonMatch[1]);
+          return res.status(500).json({ error: 'Failed to parse AI response. JSON found in markdown but invalid.' });
+        }
+      } else {
+        // Try to find JSON array directly in the text
+        const arrayMatch = responseText.match(/(\[[\s\S]*?\])/);
+        if (arrayMatch) {
+          try {
+            ideas = JSON.parse(arrayMatch[1]);
+            console.log('Successfully extracted JSON array from text');
+          } catch (arrayError) {
+            console.error('Failed to parse extracted array:', arrayMatch[1]);
+            return res.status(500).json({ error: 'Failed to parse AI response. Could not extract valid JSON.' });
+          }
+        } else {
+          console.error('No JSON found in response:', responseText);
+          return res.status(500).json({ error: 'Failed to parse AI response. No JSON found in response.' });
+        }
+      }
+    }
 
     res.status(200).json({ ideas });
   } catch (error) {
