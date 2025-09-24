@@ -24,6 +24,8 @@ export default async function handler(req, res) {
       `Title: ${article.title}\nDescription: ${article.description}\nPublished: ${article.publishedAt}`
     ).join('\n\n');
 
+    console.log('Articles received for analysis:', articles);
+
     const prompt = `Analyze the following news articles related to "${keyword}" and identify emerging trends. 
 
 Articles:

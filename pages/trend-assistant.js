@@ -9,7 +9,10 @@ export default function TrendAssistant() {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedKeyword, setSelectedKeyword] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('Australia');
+  const [customKeyword, setCustomKeyword] = useState('');
   const [error, setError] = useState('');
+  const [mode, setMode] = useState('client');
 
   useEffect(() => {
     const stored = localStorage.getItem('clients');
@@ -28,9 +31,29 @@ export default function TrendAssistant() {
         const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
         if (storedTrends) {
           setTrends(JSON.parse(storedTrends));
-          setSelectedClient(clientId);
-          if (storedKeyword) {
-            setSelectedKeyword(storedKeyword);
+          if (clientId === "custom") {
+            setSelectedClient("");
+            setSelectedKeyword("custom");
+            if (storedKeyword) {
+              setCustomKeyword(storedKeyword);
+            }
+          } else {
+            setSelectedClient(clientId);
+            if (storedKeyword) {
+              const client = clients.find(c => c.id == clientId);
+              if (client && client.spheres) {
+                const keywords = client.spheres.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                if (keywords.includes(storedKeyword)) {
+                  setSelectedKeyword(storedKeyword);
+                } else {
+                  setSelectedKeyword("custom");
+                  setCustomKeyword(storedKeyword);
+                }
+              } else {
+                setSelectedKeyword("custom");
+                setCustomKeyword(storedKeyword);
+              }
+            }
           }
         }
       }
@@ -39,36 +62,69 @@ export default function TrendAssistant() {
 
   useEffect(() => {
     // Reset keyword selection when client changes
-    setSelectedKeyword('');
-    if (selectedClient) {
-      const client = clients.find(c => c.id == selectedClient);
-      if (client && client.spheres) {
-        const keywords = client.spheres.split(',').map(k => k.trim()).filter(k => k.length > 0);
-        if (keywords.length > 0) {
-          // If we have stored keyword, use it; otherwise use first one
-          const storedKeyword = localStorage.getItem(`keyword_${selectedClient}`);
-          setSelectedKeyword(storedKeyword && keywords.includes(storedKeyword) ? storedKeyword : keywords[0]);
+    if (mode === 'client') {
+      setSelectedKeyword('');
+      if (selectedClient) {
+        const client = clients.find(c => c.id == selectedClient);
+        if (client && client.spheres) {
+          const keywords = client.spheres.split(',').map(k => k.trim()).filter(k => k.length > 0);
+          if (keywords.length > 0) {
+            // If we have stored keyword, use it; otherwise use first one
+            const storedKeyword = localStorage.getItem(`keyword_${selectedClient}`);
+            setSelectedKeyword(storedKeyword && keywords.includes(storedKeyword) ? storedKeyword : keywords[0]);
+          }
         }
       }
     }
-  }, [selectedClient, clients]);
+  }, [selectedClient, clients, mode]);
+
+  useEffect(() => {
+    if (mode === 'custom') {
+      setSelectedClient('');
+      setSelectedKeyword('custom');
+    } else {
+      setSelectedKeyword('');
+      setCustomKeyword('');
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    const options = getLocationOptions();
+    if (!options.includes(selectedLocation)) {
+      setSelectedLocation(options[0] || 'Australia');
+    }
+  }, [mode, selectedClient, clients]);
+
+  const defaultLocations = ['United States', 'UK', 'Australia'];
+
+  const getLocationOptions = () => {
+    if (mode === 'client' && selectedClient) {
+      const client = clients.find(c => c.id == selectedClient);
+      return client && client.outreachLocations && client.outreachLocations.length > 0 ? client.outreachLocations : defaultLocations;
+    } else {
+      return defaultLocations;
+    }
+  };
 
   const findTrends = async () => {
-    if (!selectedClient || !selectedKeyword) return;
+    if (!(selectedKeyword === "custom" ? customKeyword.trim() : selectedKeyword) || !selectedLocation) return;
     
     setLoading(true);
     setTrends([]);
     setError('');
     
+    // Clear previous cached data
+    const clientId = selectedClient || "custom";
+    localStorage.removeItem(`trends_${clientId}`);
+    localStorage.removeItem(`articles_${clientId}`);
+    localStorage.removeItem(`keyword_${clientId}`);
+    
     try {
-      const client = clients.find(c => c.id == selectedClient);
-      if (!client) {
-        setError('Client not found. Please try selecting a different client.');
-        setLoading(false);
-        return;
-      }
+      const client = selectedClient ? clients.find(c => c.id == selectedClient) : null;
       
-      console.log('Using keyword:', selectedKeyword);
+      const keyword = selectedKeyword === "custom" ? customKeyword.trim() : selectedKeyword;
+      
+      console.log('Using keyword:', keyword);
       
       const countryMap = {
         'Australia': 'au',
@@ -76,21 +132,14 @@ export default function TrendAssistant() {
         'United States': 'us'
       };
       
-      const outreachCountries = client.outreachLocations || [];
-      if (outreachCountries.length === 0) {
-        setError('No outreach locations found for this client. Please add locations in the client directory.');
-        setLoading(false);
-        return;
-      }
-      
-      const country = countryMap[outreachCountries[0]] || 'us';
+      const country = countryMap[selectedLocation] || 'us';
       console.log('Using country:', country);
       
       const API_KEY = "b747f4ded0bc7bd0eceffc4a073baae2";
       const url = "https://gnews.io/api/v4/search";
       
       const params = new URLSearchParams({
-        q: selectedKeyword,
+        q: keyword,
         lang: "en",
         country: country,
         max: 10,
@@ -111,6 +160,7 @@ export default function TrendAssistant() {
       
       if (data.articles && data.articles.length > 0) {
         console.log('Found', data.articles.length, 'articles, analyzing with AI...');
+        console.log('Articles to analyze:', data.articles);
         // Analyze with GPT
         const analyzeResponse = await fetch('/api/analyze-trends', {
           method: 'POST',
@@ -119,7 +169,7 @@ export default function TrendAssistant() {
           },
           body: JSON.stringify({
             articles: data.articles,
-            keyword: selectedKeyword
+            keyword: keyword
           }),
         });
         
@@ -136,9 +186,9 @@ export default function TrendAssistant() {
           setTrends(processedTrends);
           
           // Store trends, articles, and keyword for detail view
-          localStorage.setItem(`trends_${selectedClient}`, JSON.stringify(processedTrends));
-          localStorage.setItem(`articles_${selectedClient}`, JSON.stringify(data.articles));
-          localStorage.setItem(`keyword_${selectedClient}`, selectedKeyword);
+          localStorage.setItem(`trends_${clientId}`, JSON.stringify(processedTrends));
+          localStorage.setItem(`articles_${clientId}`, JSON.stringify(data.articles));
+          localStorage.setItem(`keyword_${clientId}`, keyword);
         } else {
           setError('No trends could be identified from the current news articles. Try again later or with a different client.');
         }
@@ -164,59 +214,89 @@ export default function TrendAssistant() {
 
       {/* Controls Menu */}
       <div className="card" style={{ marginBottom: '2rem', padding: '1.5rem' }}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'end', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'start', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-              Select Client
-            </label>
             <select
-              value={selectedClient}
-              onChange={e => setSelectedClient(e.target.value)}
+              value={mode}
+              onChange={e => setMode(e.target.value)}
               style={{ padding: '0.75rem', borderRadius: 'var(--border-radius)', border: '1px solid var(--border-color)', backgroundColor: 'white', width: '100%' }}
             >
-              <option value="">Choose a client...</option>
-              {clients.filter(c => c.status === 'active').map(client => (
-                <option key={client.id} value={client.id}>{client.name}</option>
+              <option value="client">Search by Client Spheres</option>
+              <option value="custom">Custom Keyword Search</option>
+            </select>
+          </div>
+
+          {mode === 'client' && (
+            <>
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <select
+                  value={selectedClient}
+                  onChange={e => setSelectedClient(e.target.value)}
+                  style={{ padding: '0.75rem', borderRadius: 'var(--border-radius)', border: '1px solid var(--border-color)', backgroundColor: 'white', width: '100%' }}
+                >
+                  <option value="">Choose a client...</option>
+                  {clients.filter(c => c.status === 'active').map(client => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <select
+                  value={selectedKeyword}
+                  onChange={e => setSelectedKeyword(e.target.value)}
+                  disabled={!selectedClient}
+                  style={{ padding: '0.75rem', borderRadius: 'var(--border-radius)', border: '1px solid var(--border-color)', backgroundColor: 'white', width: '100%' }}
+                >
+                  <option value="">Choose a keyword...</option>
+                  {selectedClient && clients.find(c => c.id == selectedClient)?.spheres?.split(',').map(k => k.trim()).filter(k => k.length > 0).map(keyword => (
+                    <option key={keyword} value={keyword}>{keyword}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {mode === 'custom' && (
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <input
+                type="text"
+                placeholder="Enter custom keyword"
+                value={customKeyword}
+                onChange={e => setCustomKeyword(e.target.value)}
+                style={{ padding: '0.75rem', borderRadius: 'var(--border-radius)', border: '1px solid var(--border-color)', backgroundColor: 'white', width: '100%' }}
+              />
+            </div>
+          )}
+
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <select
+              value={selectedLocation}
+              onChange={e => setSelectedLocation(e.target.value)}
+              style={{ padding: '0.75rem', borderRadius: 'var(--border-radius)', border: '1px solid var(--border-color)', backgroundColor: 'white', width: '100%' }}
+            >
+              {getLocationOptions().map(location => (
+                <option key={location} value={location}>{location}</option>
               ))}
             </select>
           </div>
 
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', display: 'block' }}>
-              Select Keyword
-            </label>
-            <select
-              value={selectedKeyword}
-              onChange={e => setSelectedKeyword(e.target.value)}
-              disabled={!selectedClient}
-              style={{ padding: '0.75rem', borderRadius: 'var(--border-radius)', border: '1px solid var(--border-color)', backgroundColor: 'white', width: '100%' }}
-            >
-              <option value="">Choose a keyword...</option>
-              {selectedClient && clients.find(c => c.id == selectedClient)?.spheres?.split(',').map(k => k.trim()).filter(k => k.length > 0).map(keyword => (
-                <option key={keyword} value={keyword}>{keyword}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ flexShrink: 0 }}>
-            <div style={{ height: '1.5rem', marginBottom: '0.5rem' }}></div> {/* Spacer for alignment */}
-            <button
-              onClick={findTrends}
-              disabled={loading || !selectedClient || !selectedKeyword}
-              style={{
-                padding: '0.75rem 1.5rem',
-                fontSize: '1rem',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--border-radius)',
-                backgroundColor: 'var(--primary-color)',
-                color: 'white',
-                cursor: 'pointer',
-                height: 'auto'
-              }}
-            >
-              {loading ? '🔍 Analyzing...' : '📈 Find Latest Trends'}
-            </button>
-          </div>
+          <button
+            onClick={findTrends}
+            disabled={loading || !(selectedKeyword === "custom" ? customKeyword.trim() : selectedKeyword) || !selectedLocation}
+            style={{
+              padding: '0.75rem 1.5rem',
+              fontSize: '1rem',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--border-radius)',
+              backgroundColor: 'var(--primary-color)',
+              color: 'white',
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+          >
+            {loading ? '🔍 Analyzing...' : '📈 Find Latest Trends'}
+          </button>
         </div>
       </div>
 
@@ -265,7 +345,7 @@ export default function TrendAssistant() {
               key={trend.id}
               className="card"
               style={{ cursor: 'pointer' }}
-              onClick={() => router.push(`/trend-detail?trendId=${trend.id}&clientId=${selectedClient}`)}
+              onClick={() => router.push(`/trend-detail?trendId=${trend.id}&clientId=${selectedClient || "custom"}`)}
             >
               <div className="flex-between" style={{ marginBottom: '1rem' }}>
                 <span className="text-sm text-muted">{trend.category}</span>
