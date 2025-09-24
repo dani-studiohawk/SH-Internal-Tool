@@ -4,8 +4,5 @@
   "/_document": "pages/_document.js",
   "/": "pages/index.js",
   "/client-directory": "pages/client-directory.js",
-  "/trend-assistant": "pages/trend-assistant.js",
-  "/ideation-assistant": "pages/ideation-assistant.js",
-  "/headline-assistant": "pages/headline-assistant.js",
   "/settings": "pages/settings.js"
 }
