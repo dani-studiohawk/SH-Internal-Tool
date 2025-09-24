@@ -1,43 +1,9 @@
 import { useState } from 'react';
+import mockTrends from '../mockTrends.js';
 
 export default function TrendAssistant() {
   const [trends, setTrends] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const mockTrends = [
-    { 
-      id: 1, 
-      title: 'AI in Marketing', 
-      description: 'How AI is transforming marketing strategies across industries.',
-      relevance: 'High',
-      category: 'Technology',
-      impact: 'Growing adoption of AI tools for personalization and automation'
-    },
-    { 
-      id: 2, 
-      title: 'Sustainable Fashion', 
-      description: 'Rise of eco-friendly fashion trends and circular economy models.',
-      relevance: 'Medium',
-      category: 'Sustainability',
-      impact: 'Consumers increasingly demand transparency in supply chains'
-    },
-    { 
-      id: 3, 
-      title: 'Remote Work Tools', 
-      description: 'New tools for remote collaboration and hybrid workplace management.',
-      relevance: 'High',
-      category: 'Workplace',
-      impact: 'Permanent shift to hybrid work models creating new market opportunities'
-    },
-    { 
-      id: 4, 
-      title: 'Voice Commerce', 
-      description: 'Shopping through voice assistants and smart speakers gaining traction.',
-      relevance: 'Medium',
-      category: 'E-commerce',
-      impact: 'Voice-optimized content becoming crucial for brands'
-    }
-  ];
 
   const findTrends = () => {
     setLoading(true);
@@ -97,18 +63,6 @@ export default function TrendAssistant() {
           {trends.map(trend => (
             <div key={trend.id} className="card">
               <div className="flex-between" style={{ marginBottom: '1rem' }}>
-                <span 
-                  style={{ 
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: '500',
-                    backgroundColor: trend.relevance === 'High' ? 'var(--accent-color)' : '#ffc107',
-                    color: 'white'
-                  }}
-                >
-                  {trend.relevance} Relevance
-                </span>
                 <span className="text-sm text-muted">{trend.category}</span>
               </div>
               

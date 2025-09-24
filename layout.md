@@ -41,7 +41,25 @@ Edit client flow:
 TBD
 
 ## Ideation Assistant
-TBD
+Ideation assistant screen:
+
+Select a client OR Select a topic OR Enter campaign brief
+
+Select a client: Drop down box with list of clients. Should pull industry and spheres of relevance from selected client.
+Select a topic: Drop down box with list of topics (generic for now)
+Enter campaign brief: As it is now
+
+Then once thats selected:
+Campaign Type:
+- Expert commentary
+- Data lead
+- Founder story
+
+Then OpenAI chatgpt writes 5 headline options which are displayed in cards as:
+Headline Title
+1 sentence summary about the idea
+If data lead it should suggest sources for the data, either external or internal
+
 
 ## Press Release Writer
 
