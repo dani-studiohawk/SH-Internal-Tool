@@ -1,0 +1,143 @@
+.sidebar {
+  width: 280px;
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  padding: 0;
+  border-right: 1px solid rgba(0, 201, 255, 0.2);
+  height: 100vh;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(0, 201, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(0, 201, 255, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.sidebar h2 {
+  color: var(--accent-color);
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding: 2rem 1.5rem 1rem;
+  margin: 0;
+  border-bottom: 1px solid rgba(0, 201, 255, 0.2);
+  position: relative;
+  z-index: 1;
+  background: rgba(0, 201, 255, 0.03);
+  backdrop-filter: blur(10px);
+}
+
+.sidebar nav {
+  padding: 1rem 0;
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  margin: 0;
+  position: relative;
+}
+
+.sidebar a {
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-radius: 0;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  position: relative;
+  border-left: 3px solid transparent;
+}
+
+.sidebar a::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  transition: width 0.3s ease;
+}
+
+.sidebar a:hover {
+  color: var(--accent-color);
+  background: rgba(0, 201, 255, 0.1);
+  border-left-color: var(--accent-color);
+  transform: translateX(5px);
+}
+
+.sidebar a:hover::before {
+  width: 100%;
+}
+
+.sidebar a:active {
+  transform: translateX(3px);
+}
+
+/* Icons for navigation items - using CSS pseudo-elements */
+.sidebar a[href="/"]::after {
+  content: "📊";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/client-directory"]::after {
+  content: "👥";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/trend-assistant"]::after {
+  content: "📈";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/ideation-assistant"]::after {
+  content: "💡";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/headline-assistant"]::after {
+  content: "📰";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/pr-writing-assistant"]::after {
+  content: "✍️";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/alerts"]::after {
+  content: "🚨";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.sidebar a[href="/settings"]::after {
+  content: "⚙️";
+  margin-left: auto;
+  font-size: 1.1rem;
+}
