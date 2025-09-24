@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function PRWritingAssistant() {
   const [draft, setDraft] = useState('');
@@ -11,8 +12,9 @@ export default function PRWritingAssistant() {
   // New state for saved ideas functionality
   const [mode, setMode] = useState('loading'); // 'loading', 'fresh', 'saved', 'recent'
   const [savedIdeas, setSavedIdeas] = useState([]);
-  const [showSavedIdeas, setShowSavedIdeas] = useState(false);
   const [selectedSavedIdea, setSelectedSavedIdea] = useState(null);
+  
+  const router = useRouter();
 
   useEffect(() => {
     // Load saved ideas
@@ -49,24 +51,6 @@ export default function PRWritingAssistant() {
     };
     
     const updatedIdeas = [newIdea, ...savedIdeas];
-    setSavedIdeas(updatedIdeas);
-    localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
-  };
-
-  const loadSavedIdea = (idea) => {
-    setSelectedSavedIdea(idea);
-    setHeadline(idea.headline);
-    setSummary(idea.summary);
-    setClientData(idea.clientData);
-    setCampaignType(idea.campaignType);
-    setSources(idea.sources || []);
-    setMode('saved');
-    setShowSavedIdeas(false);
-    generateInitialDraft(idea);
-  };
-
-  const deleteSavedIdea = (ideaId) => {
-    const updatedIdeas = savedIdeas.filter(idea => idea.id !== ideaId);
     setSavedIdeas(updatedIdeas);
     localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
   };
@@ -144,7 +128,7 @@ export default function PRWritingAssistant() {
           <p className="text-muted">Develop your story into a complete press release</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button onClick={() => setShowSavedIdeas(true)}>📚 Saved Ideas</button>
+          <button onClick={() => router.push('/saved-ideas')}>📚 Saved Ideas</button>
           <button onClick={startFresh} className="secondary">🆕 Start Fresh</button>
         </div>
       </div>
@@ -165,57 +149,6 @@ export default function PRWritingAssistant() {
               <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                 Loaded: {selectedSavedIdea.headline.substring(0, 50)}...
               </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Saved Ideas Modal */}
-      {showSavedIdeas && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ 
-            width: '80%', 
-            maxWidth: '800px', 
-            maxHeight: '80vh', 
-            overflow: 'auto',
-            margin: '2rem'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3>Saved Ideas</h3>
-              <button onClick={() => setShowSavedIdeas(false)}>✕</button>
-            </div>
-            
-            {savedIdeas.length === 0 ? (
-              <p className="text-muted">No saved ideas yet. Save headlines from the Ideation Assistant to use them here.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                {savedIdeas.map(idea => (
-                  <div key={idea.id} className="card" style={{ padding: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem' }}>{idea.headline}</h4>
-                    <p style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>{idea.summary}</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {idea.campaignType} • {idea.clientData ? idea.clientData.name : 'No client'} • {new Date(idea.savedAt).toLocaleDateString()}
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => loadSavedIdea(idea)}>📝 Use This</button>
-                        <button onClick={() => deleteSavedIdea(idea.id)} className="secondary">🗑️ Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
           </div>
         </div>
