@@ -56,14 +56,7 @@ export default function PRWritingAssistant() {
   };
 
   const startFresh = () => {
-    setHeadline('');
-    setSummary('');
-    setClientData(null);
-    setCampaignType('');
-    setSources([]);
-    setSelectedSavedIdea(null);
-    setDraft('');
-    setMode('fresh');
+    router.push('/start-fresh');
   };
 
   const generateInitialDraft = (data) => {
