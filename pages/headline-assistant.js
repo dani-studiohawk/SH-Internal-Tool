@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function HeadlineAssistant() {
   const [headlines, setHeadlines] = useState([]);
   const [loading, setLoading] = useState(false);
   const [storyAngle, setStoryAngle] = useState('');
   const [headlineStyle, setHeadlineStyle] = useState('newsworthy');
+  const [clients, setClients] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+
+  useEffect(() => {
+    // Load clients for optional client-specific headlines
+    const stored = localStorage.getItem('clients');
+    if (stored) {
+      setClients(JSON.parse(stored));
+    }
+  }, []);
 
   const mockHeadlines = [
     {
@@ -44,17 +54,39 @@ export default function HeadlineAssistant() {
     }
   ];
 
-  const generateHeadlines = () => {
+  const generateHeadlines = async () => {
     if (!storyAngle.trim()) {
       alert('Please enter your story angle or key message first!');
       return;
     }
     
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const selectedClient = selectedClientId ? clients.find(c => c.id == selectedClientId) : null;
+      
+      const response = await fetch('/api/generate-headlines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storyAngle: storyAngle.trim(),
+          headlineStyle,
+          clientData: selectedClient
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate headlines: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setHeadlines(data.headlines);
+    } catch (error) {
+      console.error('Error generating headlines:', error);
+      alert('Failed to generate headlines. Please try again.');
+      // Fallback to mock data if API fails
       setHeadlines(mockHeadlines);
-      setLoading(false);
-    }, 1800);
+    }
+    setLoading(false);
   };
 
   const getStrengthColor = (strength) => {
@@ -88,16 +120,42 @@ export default function HeadlineAssistant() {
           <select 
             value={headlineStyle} 
             onChange={(e) => setHeadlineStyle(e.target.value)}
-            style={{ width: '250px' }}
+            style={{ width: '300px' }}
           >
-            <option value="newsworthy">Newsworthy</option>
-            <option value="breaking">Breaking News</option>
-            <option value="feature">Feature Story</option>
-            <option value="thought-leadership">Thought Leadership</option>
-            <option value="human-interest">Human Interest</option>
-            <option value="mixed">Mixed Styles</option>
+            <option value="the-sun">🌞 The Sun (Punchy & Bold)</option>
+            <option value="bbc-news">📺 BBC News (Factual & Professional)</option>
+            <option value="guardian">📰 The Guardian (Thoughtful & Analytical)</option>
+            <option value="telegraph">🏛️ The Telegraph (Traditional & Establishment)</option>
+            <option value="daily-mail">📢 Daily Mail (Dramatic & Emotional)</option>
+            <option value="financial-times">💼 Financial Times (Business & Data-Driven)</option>
+            <option value="buzzfeed">🔥 BuzzFeed (Social & Shareable)</option>
+            <option value="mixed">🎭 Mixed Publication Styles</option>
           </select>
         </div>
+
+        {/* Client Selection */}
+        {clients.length > 0 && (
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Client Context (Optional):
+            </label>
+            <select
+              value={selectedClientId}
+              onChange={(e) => setSelectedClientId(e.target.value)}
+              style={{ width: '250px' }}
+            >
+              <option value="">No specific client</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.name} - {client.industry}
+                </option>
+              ))}
+            </select>
+            <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem' }}>
+              Select a client to generate headlines tailored to their brand voice and industry
+            </small>
+          </div>
+        )}
 
         <button onClick={generateHeadlines} disabled={loading}>
           {loading ? '✍️ Crafting Headlines...' : '📰 Generate Headlines'}
