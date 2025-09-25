@@ -759,10 +759,15 @@ export default function IdeationAssistant() {
       </div>
 
       {loading && (
-        <div className="card text-center" style={{ padding: '3rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧠</div>
-          <h3>Generating Ideas</h3>
-          <p className="text-muted">Using AI to craft compelling idea options...</p>
+        <div className="working-container loading-fade-in">
+          <div className="working-emoji loading-bounce">💡</div>
+          <h3 className="working-title">Generating Ideas</h3>
+          <p className="working-subtitle">Using AI to craft compelling campaign idea options...</p>
+          <div className="progress-dots">
+            <div className="progress-dot"></div>
+            <div className="progress-dot"></div>
+            <div className="progress-dot"></div>
+          </div>
         </div>
       )}
 

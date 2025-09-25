@@ -163,10 +163,15 @@ export default function HeadlineAssistant() {
       </div>
 
       {loading && (
-        <div className="card text-center" style={{ padding: '3rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✍️</div>
-          <h3>Crafting Perfect Headlines</h3>
-          <p className="text-muted">Analyzing your story angle and creating multiple headline options...</p>
+        <div className="working-container loading-fade-in">
+          <div className="working-emoji loading-bounce">✍️</div>
+          <h3 className="working-title">Crafting Perfect Headlines</h3>
+          <p className="working-subtitle">Analyzing your story angle and creating multiple headline options...</p>
+          <div className="progress-dots">
+            <div className="progress-dot"></div>
+            <div className="progress-dot"></div>
+            <div className="progress-dot"></div>
+          </div>
         </div>
       )}
 

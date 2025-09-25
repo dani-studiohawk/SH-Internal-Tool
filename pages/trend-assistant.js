@@ -54,12 +54,12 @@ export default function TrendAssistant() {
       return;
     }
 
-    setFetchingNews(true);
-    setStep('fetching');
+    setLoading(true);
+    setStep('analysis');
 
     try {
-      // Step 1: Fetch real news articles
-      console.log('Fetching news articles for:', keyword.trim(), 'in', selectedLocation);
+      // Fetch and analyze news articles in one step
+      console.log('Analyzing trends for:', keyword.trim(), 'in', selectedLocation);
       const newsResponse = await fetch('/api/fetch-news', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,11 +81,8 @@ export default function TrendAssistant() {
       }
 
       setArticles(articlesToAnalyze);
-      setFetchingNews(false);
-      setLoading(true);
-      setStep('analysis');
 
-      // Step 2: Analyze trends from the fetched articles
+      // Analyze trends from the fetched articles
       console.log(`Analyzing ${articlesToAnalyze.length} articles for trends...`);
       const trendsResponse = await fetch('/api/analyze-trends', {
         method: 'POST',
@@ -128,7 +125,6 @@ export default function TrendAssistant() {
     }
     
     setLoading(false);
-    setFetchingNews(false);
   };
 
   const generateIdeasFromTrend = (trend) => {
@@ -347,61 +343,23 @@ export default function TrendAssistant() {
               cursor: (loading || fetchingNews) ? 'not-allowed' : 'pointer'
             }}
           >
-            {fetchingNews ? '📰 Fetching News...' : loading ? '🔍 Analyzing Trends...' : '🚀 Fetch News & Analyze Trends'}
+            {loading ? '� Analyzing Trends...' : '🚀 Analyze Market Trends'}
           </button>
         </div>
       )}
 
-      {/* Step 2: Fetching News */}
-      {step === 'fetching' && fetchingNews && (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📰</div>
-          <h3 style={{ marginBottom: '1rem' }}>Fetching Latest News</h3>
-          <p className="text-muted" style={{ marginBottom: '2rem' }}>
-            Searching for the most recent articles about "{keyword}" from news sources worldwide...
-          </p>
-          <div style={{ 
-            width: '200px', 
-            height: '4px', 
-            backgroundColor: 'var(--border-color)',
-            borderRadius: '2px',
-            margin: '0 auto',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: '30%',
-              height: '100%',
-              backgroundColor: 'var(--primary-color)',
-              borderRadius: '2px',
-              animation: 'pulse 2s infinite'
-            }}></div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Analysis in Progress */}
+      {/* Analysis in Progress */}
       {step === 'analysis' && loading && (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧠</div>
-          <h3 style={{ marginBottom: '1rem' }}>Analyzing Market Trends</h3>
-          <p className="text-muted" style={{ marginBottom: '2rem' }}>
-            Our AI is analyzing {articles.length} fresh articles to identify emerging trends related to "{keyword}"...
+        <div className="working-container loading-fade-in">
+          <div className="working-emoji loading-spin">📈</div>
+          <h3 className="working-title">Analyzing Market Trends</h3>
+          <p className="working-subtitle">
+            Fetching latest news and analyzing market trends related to "{keyword}"...
           </p>
-          <div style={{ 
-            width: '200px', 
-            height: '4px', 
-            backgroundColor: 'var(--border-color)',
-            borderRadius: '2px',
-            margin: '0 auto',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: '50%',
-              height: '100%',
-              backgroundColor: 'var(--accent-color)',
-              borderRadius: '2px',
-              animation: 'pulse 2s infinite'
-            }}></div>
+          <div className="progress-dots">
+            <div className="progress-dot"></div>
+            <div className="progress-dot"></div>
+            <div className="progress-dot"></div>
           </div>
         </div>
       )}

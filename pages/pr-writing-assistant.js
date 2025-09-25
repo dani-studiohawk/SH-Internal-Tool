@@ -317,6 +317,20 @@ export default function PRWritingAssistant() {
         <button onClick={generateFullPressRelease} style={{ marginBottom: '1rem' }} disabled={loading}>
           {loading ? '🧠 Generating Press Release...' : '✨ Generate Full Press Release'}
         </button>
+        
+        {loading && (
+          <div className="working-container loading-fade-in" style={{ marginBottom: '1rem' }}>
+            <div className="working-emoji loading-pulse">📝</div>
+            <h3 className="working-title">Crafting Your Press Release</h3>
+            <p className="working-subtitle">AI is writing a professional press release based on your story details...</p>
+            <div className="progress-dots">
+              <div className="progress-dot"></div>
+              <div className="progress-dot"></div>
+              <div className="progress-dot"></div>
+            </div>
+          </div>
+        )}
+        
         <textarea 
           value={draft} 
           onChange={e => setDraft(e.target.value)} 
