@@ -56,7 +56,13 @@ export default function TrendDetail() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-        <button onClick={() => router.push(`/trend-assistant?clientId=${clientId}`)} style={{ fontSize: '1.5rem' }}>←</button>
+        <button 
+          onClick={() => {
+            // Navigate back to trend assistant with preserved results
+            router.push(`/trend-assistant?clientId=${clientId}&showResults=true`);
+          }} 
+          style={{ fontSize: '1.5rem' }}
+        >←</button>
         <div>
           <h1 style={{ margin: 0, color: 'var(--primary-color)' }}>{trend.title}</h1>
           <p className="text-muted" style={{ margin: '0.5rem 0' }}>{trend.category}</p>
@@ -100,10 +106,41 @@ export default function TrendDetail() {
 
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem' }}>
-        <button style={{ flex: 1, padding: '1rem' }}>
+        <button 
+          onClick={() => {
+            // Store trend data for ideation assistant
+            localStorage.setItem('trendData', JSON.stringify(trend));
+            // Navigate to ideation assistant
+            router.push('/ideation-assistant');
+          }}
+          style={{ flex: 1, padding: '1rem' }}
+        >
           💡 Generate Ideas
         </button>
-        <button className="secondary" style={{ flex: 1, padding: '1rem' }}>
+        <button 
+          className="secondary" 
+          onClick={() => {
+            // Store trend for PR writing assistant
+            const briefData = {
+              trendTitle: trend.title,
+              trendDescription: trend.description,
+              trendImpact: trend.impact,
+              relevanceScore: trend.relevanceScore,
+              keyword: keyword || '',
+              addedAt: new Date().toISOString()
+            };
+            
+            // Add to existing brief data or create new
+            const existingBrief = localStorage.getItem('briefData');
+            let briefContent = existingBrief ? JSON.parse(existingBrief) : {};
+            
+            briefContent.trendContext = briefData;
+            localStorage.setItem('briefData', JSON.stringify(briefContent));
+            
+            alert(`✅ Trend added to brief!\n\n"${trend.title}"\n\nYou can access it in the PR Writing Assistant.`);
+          }}
+          style={{ flex: 1, padding: '1rem' }}
+        >
           📋 Add to Brief
         </button>
       </div>

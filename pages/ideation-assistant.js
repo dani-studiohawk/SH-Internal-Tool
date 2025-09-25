@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 export default function IdeationAssistant() {
-  const [selectionMode, setSelectionMode] = useState('brief'); // 'client', 'topic', 'brief'
+  const [selectionMode, setSelectionMode] = useState('brief'); // 'client', 'topic', 'brief', 'trend'
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('');
   const [campaignBrief, setCampaignBrief] = useState('');
@@ -10,6 +10,7 @@ export default function IdeationAssistant() {
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
+  const [selectedTrend, setSelectedTrend] = useState(null);
 
   const router = useRouter();
 
@@ -31,6 +32,15 @@ export default function IdeationAssistant() {
     if (stored) {
       setClients(JSON.parse(stored));
     }
+
+    // Check for trend data from Trend Assistant
+    const trendData = localStorage.getItem('trendData');
+    if (trendData) {
+      const data = JSON.parse(trendData);
+      setSelectionMode('trend');
+      setSelectedTrend(data);
+      localStorage.removeItem('trendData'); // Clear it after loading
+    }
   }, []);
 
   const generateIdeas = async () => {
@@ -42,6 +52,8 @@ export default function IdeationAssistant() {
       context = `Topic: ${selectedTopic}`;
     } else if (selectionMode === 'brief' && campaignBrief) {
       context = `Campaign Brief: ${campaignBrief}`;
+    } else if (selectionMode === 'trend' && selectedTrend) {
+      context = `Trend: ${selectedTrend.title}, Description: ${selectedTrend.description}, Impact: ${selectedTrend.impact}`;
     } else {
       alert('Please select or enter a context first!');
       return;
@@ -81,6 +93,8 @@ export default function IdeationAssistant() {
     let clientData = null;
     if (selectionMode === 'client' && selectedClient) {
       clientData = clients.find(c => c.id == selectedClient);
+    } else if (selectionMode === 'trend' && selectedTrend && selectedTrend.clientId && selectedTrend.clientId !== "custom") {
+      clientData = clients.find(c => c.id == selectedTrend.clientId);
     }
 
     // Prepare data to pass to PR writer
@@ -92,7 +106,8 @@ export default function IdeationAssistant() {
       clientData,
       context: selectionMode === 'client' ? `Client: ${clientData?.name}` : 
                selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
-               `Brief: ${campaignBrief}`
+               selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
+               selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : ''
     };
 
     // Store in localStorage and navigate
@@ -107,6 +122,8 @@ export default function IdeationAssistant() {
       let clientData = null;
       if (selectionMode === 'client' && selectedClient) {
         clientData = clients.find(c => c.id == selectedClient);
+      } else if (selectionMode === 'trend' && selectedTrend && selectedTrend.clientId && selectedTrend.clientId !== "custom") {
+        clientData = clients.find(c => c.id == selectedTrend.clientId);
       }
 
       // Prepare data to save
@@ -118,7 +135,8 @@ export default function IdeationAssistant() {
         clientData,
         context: selectionMode === 'client' ? `Client: ${clientData?.name}` : 
                  selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
-                 `Brief: ${campaignBrief}`
+                 selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
+                 selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : ''
       };
 
       // Save to localStorage
@@ -213,6 +231,26 @@ export default function IdeationAssistant() {
               <h4 style={{ marginBottom: '0.5rem' }}>Write a Brief</h4>
               <p className="text-sm text-muted">
                 Describe your campaign idea in your own words
+              </p>
+            </div>
+          </div>
+
+          {/* Trend Card */}
+          <div
+            className={`card ${selectionMode === 'trend' ? 'selected' : ''}`}
+            style={{
+              cursor: 'pointer',
+              border: selectionMode === 'trend' ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+              backgroundColor: selectionMode === 'trend' ? 'rgba(0, 201, 255, 0.05)' : 'var(--secondary-color)',
+              transition: 'all 0.3s ease'
+            }}
+            onClick={() => setSelectionMode('trend')}
+          >
+            <div style={{ textAlign: 'center', padding: '1rem' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📈</div>
+              <h4 style={{ marginBottom: '0.5rem' }}>Start with a Trend</h4>
+              <p className="text-sm text-muted">
+                Generate ideas based on a market trend from Trend Assistant
               </p>
             </div>
           </div>
@@ -318,6 +356,85 @@ export default function IdeationAssistant() {
               <div className="text-sm text-muted" style={{ marginTop: '0.5rem' }}>
                 Be as specific as possible - include details about the story, audience, goals, or any constraints.
               </div>
+            </div>
+          )}
+
+          {selectionMode === 'trend' && selectedTrend && (
+            <div>
+              <div style={{
+                marginTop: '1rem',
+                padding: '1.5rem',
+                backgroundColor: 'var(--secondary-color)',
+                borderRadius: 'var(--border-radius)',
+                border: '1px solid var(--border-color)'
+              }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>
+                    📈 {selectedTrend.title}
+                  </h4>
+                  {selectedTrend.category && (
+                    <span style={{ 
+                      fontSize: '0.85rem', 
+                      color: 'var(--text-muted)',
+                      backgroundColor: 'var(--accent-color)',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px'
+                    }}>
+                      {selectedTrend.category}
+                    </span>
+                  )}
+                </div>
+                <div style={{ lineHeight: '1.6' }}>
+                  <p style={{ margin: '0 0 1rem 0' }}>{selectedTrend.description}</p>
+                  
+                  <div style={{ 
+                    backgroundColor: 'rgba(0, 201, 255, 0.1)', 
+                    padding: '1rem', 
+                    borderRadius: 'var(--border-radius)',
+                    marginBottom: '1rem'
+                  }}>
+                    <strong style={{ color: 'var(--primary-color)' }}>Market Impact:</strong>
+                    <div style={{ marginTop: '0.5rem' }}>{selectedTrend.impact}</div>
+                  </div>
+                  
+                  {selectedTrend.relevanceScore && (
+                    <div style={{ textAlign: 'center' }}>
+                      <strong>Relevance Score: </strong>
+                      <span style={{ 
+                        fontSize: '1.2rem', 
+                        fontWeight: 'bold',
+                        color: selectedTrend.relevanceScore >= 8 ? '#28a745' : 
+                               selectedTrend.relevanceScore >= 6 ? '#ffc107' : '#dc3545'
+                      }}>
+                        {selectedTrend.relevanceScore}/10
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectionMode === 'trend' && !selectedTrend && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '2rem',
+              backgroundColor: 'var(--secondary-color)',
+              borderRadius: 'var(--border-radius)',
+              textAlign: 'center',
+              border: '2px dashed var(--border-color)'
+            }}>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📈</div>
+              <h4 style={{ margin: '0 0 0.5rem 0' }}>No Trend Selected</h4>
+              <p className="text-muted" style={{ margin: 0 }}>
+                Visit the Trend Assistant to analyze market trends and return here to generate ideas.
+              </p>
+              <button 
+                onClick={() => router.push('/trend-assistant')}
+                style={{ marginTop: '1rem', padding: '0.75rem 1.5rem' }}
+              >
+                🔍 Go to Trend Assistant
+              </button>
             </div>
           )}
         </div>
