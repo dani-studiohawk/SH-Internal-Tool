@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function ClientDirectory() {
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
     industry: '',
@@ -63,6 +65,43 @@ export default function ClientDirectory() {
   const deleteClient = (id) => {
     const filtered = clients.filter(c => c.id !== id);
     saveClients(filtered);
+  };
+
+  const getClientActivitySummary = (clientId) => {
+    try {
+      const activity = JSON.parse(localStorage.getItem(`client_${clientId}_activity`) || '{}');
+      return {
+        trendsCount: (activity.savedTrends || []).length,
+        ideasCount: (activity.savedIdeas || []).length,
+        prsCount: (activity.savedPRs || []).length,
+        lastActivity: getLastActivityDate(activity)
+      };
+    } catch (error) {
+      return { trendsCount: 0, ideasCount: 0, prsCount: 0, lastActivity: null };
+    }
+  };
+
+  const getLastActivityDate = (activity) => {
+    const allItems = [
+      ...(activity.savedTrends || []),
+      ...(activity.savedIdeas || []),
+      ...(activity.savedPRs || [])
+    ];
+    
+    if (allItems.length === 0) return null;
+    
+    const dates = allItems.map(item => new Date(item.savedAt)).filter(date => !isNaN(date));
+    if (dates.length === 0) return null;
+    
+    const latest = new Date(Math.max(...dates));
+    const now = new Date();
+    const diffTime = Math.abs(now - latest);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays <= 7) return `${diffDays} days ago`;
+    if (diffDays <= 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+    return `${Math.ceil(diffDays / 30)} months ago`;
   };
 
   return (
@@ -273,19 +312,69 @@ export default function ClientDirectory() {
                 </p>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              {/* Activity Summary */}
+              {(() => {
+                const activity = getClientActivitySummary(client.id);
+                const hasActivity = activity.trendsCount > 0 || activity.ideasCount > 0 || activity.prsCount > 0;
+                
+                return hasActivity ? (
+                  <div style={{ 
+                    backgroundColor: 'var(--secondary-color)', 
+                    padding: '0.75rem', 
+                    borderRadius: 'var(--border-radius)',
+                    marginTop: '1rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div className="text-sm" style={{ marginBottom: '0.5rem', fontWeight: '500' }}>
+                      🏢 Recent Activity:
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {activity.trendsCount > 0 && <span>📈 {activity.trendsCount} trends</span>}
+                      {activity.ideasCount > 0 && <span>💡 {activity.ideasCount} ideas</span>}
+                      {activity.prsCount > 0 && <span>📰 {activity.prsCount} PRs</span>}
+                    </div>
+                    {activity.lastActivity && (
+                      <div className="text-sm text-muted" style={{ marginTop: '0.25rem' }}>
+                        Last activity: {activity.lastActivity}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ 
+                    backgroundColor: 'rgba(108, 117, 125, 0.1)', 
+                    padding: '0.75rem', 
+                    borderRadius: 'var(--border-radius)',
+                    marginTop: '1rem',
+                    marginBottom: '1rem',
+                    textAlign: 'center'
+                  }}>
+                    <div className="text-sm text-muted">
+                      📋 No saved activity yet
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => router.push(`/client-activity?clientId=${client.id}`)}
+                  style={{ flex: 1, minWidth: '120px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                >
+                  📋 View Activity
+                </button>
                 <button 
                   onClick={() => editClient(client)}
-                  style={{ flex: 1, fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                  className="secondary"
+                  style={{ flex: 1, minWidth: '100px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}
                 >
                   ✏️ Edit
                 </button>
                 <button 
                   onClick={() => deleteClient(client.id)}
                   className="danger"
-                  style={{ flex: 1, fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                  style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}
                 >
-                  🗑️ Remove
+                  🗑️
                 </button>
               </div>
             </div>

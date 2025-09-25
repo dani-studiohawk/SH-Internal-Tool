@@ -17,9 +17,56 @@ export default function PRWritingAssistant() {
   
   const router = useRouter();
 
+  // Client directory integration
+  const [clients, setClients] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+
+  const loadClients = () => {
+    const clientsData = localStorage.getItem('clients');
+    if (clientsData) {
+      setClients(JSON.parse(clientsData));
+    }
+  };
+
+  const saveToClientActivity = (clientId, activityData) => {
+    try {
+      // Get existing client activity using the same pattern as other tools
+      const existingActivity = JSON.parse(localStorage.getItem(`client_${clientId}_activity`) || '{}');
+      
+      // Initialize arrays if they don't exist
+      if (!existingActivity.savedTrends) existingActivity.savedTrends = [];
+      if (!existingActivity.savedIdeas) existingActivity.savedIdeas = [];
+      if (!existingActivity.savedPRs) existingActivity.savedPRs = [];
+
+      // Create the press release activity
+      const prActivity = {
+        id: Date.now().toString(),
+        headline: activityData.headline || 'Press Release Draft',
+        summary: activityData.summary || '',
+        content: activityData.draft || '',
+        campaignType: activityData.campaignType || '',
+        sources: activityData.sources || [],
+        savedAt: new Date().toISOString(),
+        notes: '' // Can be extended later
+      };
+      
+      // Add to savedPRs array
+      existingActivity.savedPRs.push(prActivity);
+      
+      // Save back to localStorage
+      localStorage.setItem(`client_${clientId}_activity`, JSON.stringify(existingActivity));
+      
+      return prActivity.id;
+    } catch (error) {
+      console.error('Error saving to client activity:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
-    // Load saved ideas
+    // Load saved ideas and clients
     loadSavedIdeas();
+    loadClients();
     
     // Check for recent session data
     const storyData = localStorage.getItem('storyData');
@@ -31,7 +78,13 @@ export default function PRWritingAssistant() {
       setCampaignType(data.campaignType);
       setSources(data.sources || []);
       setMode('recent');
-      generateInitialDraft(data);
+      
+      // If editing an existing PR, use the existing content
+      if (data.existingContent) {
+        setDraft(data.existingContent);
+      } else {
+        generateInitialDraft(data);
+      }
     } else {
       setMode('fresh');
     }
@@ -139,6 +192,74 @@ export default function PRWritingAssistant() {
     setLoading(false);
   };
 
+  const copyToClipboard = async () => {
+    if (!draft) {
+      alert('No press release content to copy!');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(draft);
+      alert('Press release copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = draft;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('Press release copied to clipboard!');
+    }
+  };
+
+  const saveDraft = () => {
+    if (!draft) {
+      alert('No press release content to save!');
+      return;
+    }
+
+    if (!selectedClientId) {
+      if (confirm('No client selected. Would you like to save this to the general drafts?')) {
+        // Save to general saved ideas
+        const draftData = {
+          headline,
+          summary,
+          draft,
+          campaignType,
+          sources,
+          clientData,
+          savedAt: new Date().toISOString()
+        };
+        saveIdea(draftData);
+        alert('Press release draft saved!');
+      }
+      return;
+    }
+
+    const client = clients.find(c => c.id === parseInt(selectedClientId));
+    if (!client) {
+      alert('Selected client not found!');
+      return;
+    }
+
+    try {
+      const activityId = saveToClientActivity(selectedClientId, {
+        headline,
+        summary,
+        draft,
+        campaignType,
+        sources
+      });
+      
+      alert(`Press release draft saved to ${client.name}'s activity!`);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert('Failed to save draft. Please try again.');
+    }
+  };
+
   return (
     <div>
       <div className="flex-between mb-4">
@@ -209,11 +330,25 @@ export default function PRWritingAssistant() {
       {/* Quick Actions */}
       <div className="card">
         <h3>Quick Actions</h3>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <button>📋 Copy to Clipboard</button>
-          <button className="secondary">💾 Save Draft</button>
-          <button className="secondary">📤 Export as Word</button>
-          <button className="secondary">📧 Send for Review</button>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={copyToClipboard} disabled={!draft}>
+            📋 Copy to Clipboard
+          </button>
+          <button className="secondary" onClick={saveDraft} disabled={!draft}>
+            💾 Save Draft
+          </button>
+          {clients.length > 0 && (
+            <select 
+              value={selectedClientId} 
+              onChange={(e) => setSelectedClientId(e.target.value)}
+              style={{ padding: '0.5rem', marginLeft: '1rem' }}
+            >
+              <option value="">Select client (optional)</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
     </div>

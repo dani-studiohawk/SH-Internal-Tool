@@ -9,7 +9,14 @@ export default function TrendAssistant() {
   const [fetchingNews, setFetchingNews] = useState(false);
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('au'); // Default to Australia
   const [step, setStep] = useState('input'); // 'input', 'fetching', 'analysis', 'results'
+
+  const locations = [
+    { code: 'au', name: 'Australia', flag: '🇦🇺' },
+    { code: 'us', name: 'United States', flag: '🇺🇸' },
+    { code: 'gb', name: 'United Kingdom', flag: '🇬🇧' }
+  ];
 
   const router = useRouter();
 
@@ -52,11 +59,14 @@ export default function TrendAssistant() {
 
     try {
       // Step 1: Fetch real news articles
-      console.log('Fetching news articles for:', keyword.trim());
+      console.log('Fetching news articles for:', keyword.trim(), 'in', selectedLocation);
       const newsResponse = await fetch('/api/fetch-news', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: keyword.trim() })
+        body: JSON.stringify({ 
+          keyword: keyword.trim(),
+          country: selectedLocation 
+        })
       });
 
       if (!newsResponse.ok) {
@@ -134,6 +144,66 @@ export default function TrendAssistant() {
     router.push(`/trend-detail?trendId=${trend.id}&clientId=${clientKey}&returnToResults=true`);
   };
 
+  const saveToClientActivity = (item, type) => {
+    if (clients.length === 0) {
+      alert('No clients available. Please add clients first.');
+      return;
+    }
+
+    // Create a modal-like prompt for client selection
+    const clientOptions = clients.map(c => `${c.id}: ${c.name} - ${c.industry}`).join('\n');
+    const selectedClientId = prompt(
+      `Save this ${type} to which client?\n\n${clientOptions}\n\nEnter client ID:`,
+      selectedClient || clients[0]?.id
+    );
+
+    if (!selectedClientId) return; // User cancelled
+
+    const client = clients.find(c => c.id == selectedClientId);
+    if (!client) {
+      alert('Invalid client ID selected.');
+      return;
+    }
+
+    // Add optional notes
+    const notes = prompt(`Add notes for this ${type} (optional):`, '');
+
+    try {
+      // Get existing client activity
+      const existingActivity = JSON.parse(localStorage.getItem(`client_${selectedClientId}_activity`) || '{}');
+      
+      // Initialize arrays if they don't exist
+      if (!existingActivity.savedTrends) existingActivity.savedTrends = [];
+      if (!existingActivity.savedIdeas) existingActivity.savedIdeas = [];
+      if (!existingActivity.savedPRs) existingActivity.savedPRs = [];
+
+      // Add the item to appropriate array
+      const savedItem = {
+        ...item,
+        savedAt: new Date().toISOString(),
+        notes: notes || '',
+        clientId: selectedClientId,
+        clientName: client.name
+      };
+
+      if (type === 'trend') {
+        existingActivity.savedTrends.unshift(savedItem); // Add to beginning
+      } else if (type === 'idea') {
+        existingActivity.savedIdeas.unshift(savedItem);
+      } else if (type === 'pr') {
+        existingActivity.savedPRs.unshift(savedItem);
+      }
+
+      // Save back to localStorage
+      localStorage.setItem(`client_${selectedClientId}_activity`, JSON.stringify(existingActivity));
+
+      alert(`✅ ${type.charAt(0).toUpperCase() + type.slice(1)} saved to ${client.name}'s activity!${notes ? `\n\nNotes: ${notes}` : ''}`);
+    } catch (error) {
+      console.error('Error saving to client activity:', error);
+      alert('❌ Error saving to client activity. Please try again.');
+    }
+  };
+
   const startOver = () => {
     setKeyword('');
     setArticles([]);
@@ -191,6 +261,34 @@ export default function TrendAssistant() {
               </select>
             </div>
           )}
+
+          {/* Location Selection */}
+          <div style={{ marginBottom: '2rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              News Source Location
+            </label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: 'var(--border-radius)',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'white',
+                fontSize: '1rem'
+              }}
+            >
+              {locations.map(location => (
+                <option key={location.code} value={location.code}>
+                  {location.flag} {location.name}
+                </option>
+              ))}
+            </select>
+            <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem' }}>
+              Select the region to source news articles from for trend analysis
+            </small>
+          </div>
 
           {/* Keyword Input */}
           <div style={{ marginBottom: '2rem' }}>
@@ -379,12 +477,13 @@ export default function TrendAssistant() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => generateIdeasFromTrend(trend)}
                     style={{
                       flex: 1,
-                      padding: '0.75rem 1.5rem',
+                      minWidth: '140px',
+                      padding: '0.75rem 1rem',
                       backgroundColor: 'var(--primary-color)',
                       color: 'white',
                       border: 'none',
@@ -400,13 +499,32 @@ export default function TrendAssistant() {
                     className="secondary"
                     style={{
                       flex: 1,
-                      padding: '0.75rem 1.5rem',
+                      minWidth: '140px',
+                      padding: '0.75rem 1rem',
                       borderRadius: 'var(--border-radius)',
                       cursor: 'pointer'
                     }}
                   >
                     📋 View Details
                   </button>
+                  {clients.length > 0 && (
+                    <button
+                      onClick={() => saveToClientActivity(trend, 'trend')}
+                      className="secondary"
+                      style={{
+                        flex: 1,
+                        minWidth: '140px',
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--border-radius)',
+                        cursor: 'pointer',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderColor: '#28a745',
+                        color: '#28a745'
+                      }}
+                    >
+                      💾 Save to Client
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

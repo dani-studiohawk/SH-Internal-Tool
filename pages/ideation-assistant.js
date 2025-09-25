@@ -11,6 +11,8 @@ export default function IdeationAssistant() {
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [selectedTrend, setSelectedTrend] = useState(null);
+  const [editingTrend, setEditingTrend] = useState(false);
+  const [editedTrend, setEditedTrend] = useState({});
 
   const router = useRouter();
 
@@ -42,6 +44,32 @@ export default function IdeationAssistant() {
       localStorage.removeItem('trendData'); // Clear it after loading
     }
   }, []);
+
+  const startEditingTrend = () => {
+    setEditingTrend(true);
+    setEditedTrend({
+      title: selectedTrend.title || '',
+      description: selectedTrend.description || '',
+      impact: selectedTrend.impact || '',
+      category: selectedTrend.category || '',
+      relevanceScore: selectedTrend.relevanceScore || 0
+    });
+  };
+
+  const saveEditedTrend = () => {
+    const updatedTrend = {
+      ...selectedTrend,
+      ...editedTrend
+    };
+    setSelectedTrend(updatedTrend);
+    setEditingTrend(false);
+    setEditedTrend({});
+  };
+
+  const cancelEditingTrend = () => {
+    setEditingTrend(false);
+    setEditedTrend({});
+  };
 
   const generateIdeas = async () => {
     let context = '';
@@ -155,6 +183,81 @@ export default function IdeationAssistant() {
     } catch (error) {
       console.error('Error saving idea:', error);
       alert('❌ Error saving idea. Please try again.');
+    }
+  };
+
+  const saveToClientActivity = (ideaTitle, ideaSummary, ideaSources, type = 'idea') => {
+    if (clients.length === 0) {
+      alert('No clients available. Please add clients first.');
+      return;
+    }
+
+    // Determine client context
+    let contextClientId = null;
+    if (selectionMode === 'client' && selectedClient) {
+      contextClientId = selectedClient;
+    } else if (selectionMode === 'trend' && selectedTrend && selectedTrend.clientId && selectedTrend.clientId !== "custom") {
+      contextClientId = selectedTrend.clientId;
+    }
+
+    // Create client selection prompt
+    const clientOptions = clients.map(c => `${c.id}: ${c.name} - ${c.industry}`).join('\n');
+    const selectedClientId = prompt(
+      `Save this ${type} to which client?\n\n${clientOptions}\n\nEnter client ID:`,
+      contextClientId || clients[0]?.id
+    );
+
+    if (!selectedClientId) return; // User cancelled
+
+    const client = clients.find(c => c.id == selectedClientId);
+    if (!client) {
+      alert('Invalid client ID selected.');
+      return;
+    }
+
+    // Add optional notes
+    const notes = prompt(`Add notes for this ${type} (optional):`, '');
+
+    try {
+      // Get client data if selected
+      let clientData = client;
+
+      // Prepare data to save
+      const itemData = {
+        headline: ideaTitle,
+        summary: ideaSummary,
+        sources: ideaSources || [],
+        campaignType,
+        clientData,
+        context: selectionMode === 'client' ? `Client: ${clientData?.name}` : 
+                 selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
+                 selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
+                 selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : '',
+        savedAt: new Date().toISOString(),
+        notes: notes || '',
+        clientId: selectedClientId,
+        clientName: client.name,
+        id: Date.now().toString()
+      };
+
+      // Get existing client activity
+      const existingActivity = JSON.parse(localStorage.getItem(`client_${selectedClientId}_activity`) || '{}');
+      
+      // Initialize arrays if they don't exist
+      if (!existingActivity.savedTrends) existingActivity.savedTrends = [];
+      if (!existingActivity.savedIdeas) existingActivity.savedIdeas = [];
+      if (!existingActivity.savedPRs) existingActivity.savedPRs = [];
+
+      // Add to client activity
+      existingActivity.savedIdeas.unshift(itemData);
+
+      // Save to client activity
+      localStorage.setItem(`client_${selectedClientId}_activity`, JSON.stringify(existingActivity));
+
+      alert(`✅ Idea saved to ${client.name}'s activity!\n\n"${ideaTitle}"${notes ? `\n\nNotes: ${notes}` : ''}`);
+    } catch (error) {
+      console.error('Error saving to client activity:', error);
+      alert('❌ Error saving to client activity. Please try again.');
     }
   };
 
@@ -368,49 +471,201 @@ export default function IdeationAssistant() {
                 borderRadius: 'var(--border-radius)',
                 border: '1px solid var(--border-color)'
               }}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>
-                    📈 {selectedTrend.title}
-                  </h4>
-                  {selectedTrend.category && (
-                    <span style={{ 
-                      fontSize: '0.85rem', 
-                      color: 'var(--text-muted)',
-                      backgroundColor: 'var(--accent-color)',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px'
-                    }}>
-                      {selectedTrend.category}
-                    </span>
-                  )}
-                </div>
-                <div style={{ lineHeight: '1.6' }}>
-                  <p style={{ margin: '0 0 1rem 0' }}>{selectedTrend.description}</p>
-                  
-                  <div style={{ 
-                    backgroundColor: 'rgba(0, 201, 255, 0.1)', 
-                    padding: '1rem', 
-                    borderRadius: 'var(--border-radius)',
-                    marginBottom: '1rem'
-                  }}>
-                    <strong style={{ color: 'var(--primary-color)' }}>Market Impact:</strong>
-                    <div style={{ marginTop: '0.5rem' }}>{selectedTrend.impact}</div>
-                  </div>
-                  
-                  {selectedTrend.relevanceScore && (
-                    <div style={{ textAlign: 'center' }}>
-                      <strong>Relevance Score: </strong>
-                      <span style={{ 
-                        fontSize: '1.2rem', 
-                        fontWeight: 'bold',
-                        color: selectedTrend.relevanceScore >= 8 ? '#28a745' : 
-                               selectedTrend.relevanceScore >= 6 ? '#ffc107' : '#dc3545'
-                      }}>
-                        {selectedTrend.relevanceScore}/10
-                      </span>
+                {!editingTrend ? (
+                  // Display Mode
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div>
+                        <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-color)' }}>
+                          📈 {selectedTrend.title}
+                        </h4>
+                        {selectedTrend.category && (
+                          <span style={{ 
+                            fontSize: '0.85rem', 
+                            color: 'var(--text-muted)',
+                            backgroundColor: 'var(--accent-color)',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px'
+                          }}>
+                            {selectedTrend.category}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={startEditingTrend}
+                        className="secondary"
+                        style={{ 
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.9rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        ✏️ Edit Trend
+                      </button>
                     </div>
-                  )}
-                </div>
+                    
+                    <div style={{ lineHeight: '1.6' }}>
+                      <p style={{ margin: '0 0 1rem 0' }}>{selectedTrend.description}</p>
+                      
+                      <div style={{ 
+                        backgroundColor: 'rgba(0, 201, 255, 0.1)', 
+                        padding: '1rem', 
+                        borderRadius: 'var(--border-radius)',
+                        marginBottom: '1rem'
+                      }}>
+                        <strong style={{ color: 'var(--primary-color)' }}>Market Impact:</strong>
+                        <div style={{ marginTop: '0.5rem' }}>{selectedTrend.impact}</div>
+                      </div>
+                      
+                      {selectedTrend.relevanceScore && (
+                        <div style={{ textAlign: 'center' }}>
+                          <strong>Relevance Score: </strong>
+                          <span style={{ 
+                            fontSize: '1.2rem', 
+                            fontWeight: 'bold',
+                            color: selectedTrend.relevanceScore >= 8 ? '#28a745' : 
+                                   selectedTrend.relevanceScore >= 6 ? '#ffc107' : '#dc3545'
+                          }}>
+                            {selectedTrend.relevanceScore}/10
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  // Edit Mode
+                  <>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>
+                        ✏️ Edit Trend Details
+                      </h4>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                          Trend Title
+                        </label>
+                        <input
+                          type="text"
+                          value={editedTrend.title}
+                          onChange={(e) => setEditedTrend({ ...editedTrend, title: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: 'var(--border-radius)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '1rem'
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                          Category
+                        </label>
+                        <input
+                          type="text"
+                          value={editedTrend.category}
+                          onChange={(e) => setEditedTrend({ ...editedTrend, category: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: 'var(--border-radius)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '1rem'
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                          Description
+                        </label>
+                        <textarea
+                          value={editedTrend.description}
+                          onChange={(e) => setEditedTrend({ ...editedTrend, description: e.target.value })}
+                          rows={3}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: 'var(--border-radius)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '1rem',
+                            resize: 'vertical'
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                          Market Impact
+                        </label>
+                        <textarea
+                          value={editedTrend.impact}
+                          onChange={(e) => setEditedTrend({ ...editedTrend, impact: e.target.value })}
+                          rows={3}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: 'var(--border-radius)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '1rem',
+                            resize: 'vertical'
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                          Relevance Score (0-10)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={editedTrend.relevanceScore}
+                          onChange={(e) => setEditedTrend({ ...editedTrend, relevanceScore: parseInt(e.target.value) || 0 })}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            borderRadius: 'var(--border-radius)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '1rem'
+                          }}
+                        />
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                        <button
+                          onClick={saveEditedTrend}
+                          style={{ 
+                            padding: '0.75rem 1.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          💾 Save Changes
+                        </button>
+                        <button
+                          onClick={cancelEditingTrend}
+                          className="secondary"
+                          style={{ 
+                            padding: '0.75rem 1.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          ❌ Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -560,20 +815,37 @@ export default function IdeationAssistant() {
                 )}
 
 
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                   <button 
-                    style={{ flex: 1, fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                    style={{ flex: 1, minWidth: '120px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}
                     onClick={() => developStory(idea.title, idea.summary, idea.sources)}
                   >
                     📝 Develop Story
                   </button>
                   <button 
                     className="secondary" 
-                    style={{ flex: 1, fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                    style={{ flex: 1, minWidth: '120px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}
                     onClick={() => saveIdea(idea.title, idea.summary, idea.sources)}
                   >
                     💾 Save Idea
                   </button>
+                  {clients.length > 0 && (
+                    <button 
+                      className="secondary"
+                      style={{ 
+                        flex: 1, 
+                        minWidth: '120px', 
+                        fontSize: '0.875rem', 
+                        padding: '0.75rem 1rem',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderColor: '#28a745',
+                        color: '#28a745'
+                      }}
+                      onClick={() => saveToClientActivity(idea.title, idea.summary, idea.sources)}
+                    >
+                      💾 Save to Client
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
