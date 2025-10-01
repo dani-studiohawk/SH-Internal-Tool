@@ -1,5 +1,7 @@
 const { withAuth } = require('../../lib/auth-middleware');
 const { neon } = require('@neondatabase/serverless');
+const { validateClientActivityContent, sanitizeContent } = require('../../lib/validation');
+const { createUserRateLimit } = require('../../lib/rate-limit');
 
 // Initialize database connection
 const sql = neon(process.env.DATABASE_URL);
@@ -41,10 +43,16 @@ function validateActivityData(data, isUpdate = false) {
     errors.push('Notes must be a string under 10,000 characters');
   }
 
-  // Content validation (should be JSON-serializable)
+  // Content validation with enhanced JSON schema validation
   if (data.content) {
     try {
       JSON.stringify(data.content);
+      
+      // Apply JSON schema validation
+      const validation = validateClientActivityContent(data.content);
+      if (!validation.isValid) {
+        errors.push(`Invalid content structure: ${validation.errors.join(', ')}`);
+      }
     } catch (error) {
       errors.push('Content must be valid JSON');
     }
@@ -56,6 +64,17 @@ function validateActivityData(data, isUpdate = false) {
 async function handler(req, res) {
   // User session is available in req.session (provided by withAuth)
   console.log(`API accessed by user: ${req.session.user.email}`);
+
+  // Apply user-based rate limiting (30 requests per 15 minutes for this endpoint)
+  const userRateLimit = createUserRateLimit(30);
+  await new Promise((resolve, reject) => {
+    userRateLimit(req, res, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  }).catch(() => {
+    return; // Rate limit response already sent
+  });
 
   // Check database connection
   if (!process.env.DATABASE_URL) {
@@ -94,22 +113,42 @@ async function handler(req, res) {
 async function handleGet(req, res) {
   try {
     const { clientId, activityType, limit = 50 } = req.query;
+    const userId = req.user.id;
+    const userRole = req.user.role;
     
-    let query = sql`
-      SELECT ca.*, c.name as client_name 
+    let query;
+    
+    // Build base query with user access control
+    const baseFrom = `
       FROM client_activity ca
       JOIN clients c ON ca.client_id = c.id
     `;
+    
+    const userFilter = ['admin', 'dpr_manager'].includes(userRole) 
+      ? '' 
+      : `JOIN client_assignments cas ON c.id = cas.client_id AND cas.user_id = ${userId} AND cas.status = 'active'`;
 
     if (clientId) {
       const clientIdNum = parseInt(clientId);
       if (isNaN(clientIdNum)) {
         return res.status(400).json({ error: 'Invalid client ID' });
       }
+      
+      // Verify user has access to this specific client
+      if (!['admin', 'dpr_manager'].includes(userRole)) {
+        const hasAccess = await sql`
+          SELECT 1 FROM client_assignments 
+          WHERE client_id = ${clientIdNum} AND user_id = ${userId} AND status = 'active'
+        `;
+        if (hasAccess.length === 0) {
+          return res.status(403).json({ error: 'Access denied to this client' });
+        }
+      }
+      
       query = sql`
-        SELECT ca.*, c.name as client_name 
-        FROM client_activity ca
-        JOIN clients c ON ca.client_id = c.id
+        SELECT ca.id, ca.client_id, ca.activity_type, ca.title, ca.content, ca.notes, ca.created_at, ca.updated_at, c.name as client_name 
+        ${sql.unsafe(baseFrom)}
+        ${sql.unsafe(userFilter)}
         WHERE ca.client_id = ${clientIdNum}
         ORDER BY ca.created_at DESC
         LIMIT ${Math.min(parseInt(limit) || 50, 100)}
@@ -119,18 +158,18 @@ async function handleGet(req, res) {
         return res.status(400).json({ error: 'Invalid activity type' });
       }
       query = sql`
-        SELECT ca.*, c.name as client_name 
-        FROM client_activity ca
-        JOIN clients c ON ca.client_id = c.id
+        SELECT ca.id, ca.client_id, ca.activity_type, ca.title, ca.content, ca.notes, ca.created_at, ca.updated_at, c.name as client_name 
+        ${sql.unsafe(baseFrom)}
+        ${sql.unsafe(userFilter)}
         WHERE ca.activity_type = ${activityType}
         ORDER BY ca.created_at DESC
         LIMIT ${Math.min(parseInt(limit) || 50, 100)}
       `;
     } else {
       query = sql`
-        SELECT ca.*, c.name as client_name 
-        FROM client_activity ca
-        JOIN clients c ON ca.client_id = c.id
+        SELECT ca.id, ca.client_id, ca.activity_type, ca.title, ca.content, ca.notes, ca.created_at, ca.updated_at, c.name as client_name 
+        ${sql.unsafe(baseFrom)}
+        ${sql.unsafe(userFilter)}
         ORDER BY ca.created_at DESC
         LIMIT ${Math.min(parseInt(limit) || 50, 100)}
       `;
@@ -160,13 +199,25 @@ async function handlePost(req, res) {
   }
 
   try {
-    // Check if client exists
-    const clientExists = await sql`
-      SELECT id FROM clients WHERE id = ${req.body.clientId}
-    `;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    // Check if client exists and user has access
+    let clientAccess;
+    if (['admin', 'dpr_manager'].includes(userRole)) {
+      clientAccess = await sql`
+        SELECT id FROM clients WHERE id = ${req.body.clientId}
+      `;
+    } else {
+      clientAccess = await sql`
+        SELECT c.id FROM clients c
+        INNER JOIN client_assignments ca ON c.id = ca.client_id
+        WHERE c.id = ${req.body.clientId} AND ca.user_id = ${userId} AND ca.status = 'active'
+      `;
+    }
 
-    if (clientExists.length === 0) {
-      return res.status(400).json({ error: 'Client not found' });
+    if (clientAccess.length === 0) {
+      return res.status(403).json({ error: 'Client not found or access denied' });
     }
 
     // Sanitize input data
@@ -174,7 +225,7 @@ async function handlePost(req, res) {
       clientId: req.body.clientId,
       activityType: req.body.activityType.trim(),
       title: req.body.title?.trim() || null,
-      content: req.body.content || null,
+      content: req.body.content ? sanitizeContent(req.body.content) : null,
       notes: req.body.notes?.trim() || null
     };
 
@@ -229,7 +280,7 @@ async function handlePut(req, res) {
     
     if (req.body.activityType !== undefined) updates.activity_type = req.body.activityType.trim();
     if (req.body.title !== undefined) updates.title = req.body.title?.trim() || null;
-    if (req.body.content !== undefined) updates.content = req.body.content;
+    if (req.body.content !== undefined) updates.content = req.body.content ? sanitizeContent(req.body.content) : null;
     if (req.body.notes !== undefined) updates.notes = req.body.notes?.trim() || null;
 
     if (Object.keys(updates).length === 0) {

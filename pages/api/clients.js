@@ -102,10 +102,33 @@ async function handler(req, res) {
 
 async function handleGet(req, res) {
   try {
-    const clients = await sql`
-      SELECT * FROM clients 
-      ORDER BY name ASC
-    `;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    let clients;
+    
+    // Admin and DPR managers can see all clients
+    if (['admin', 'dpr_manager'].includes(userRole)) {
+      clients = await sql`
+        SELECT 
+          id, name, industry, status, url, lead_dpr, tone_of_voice, 
+          spheres, outreach_locations, created_at, updated_at
+        FROM clients 
+        ORDER BY name ASC
+      `;
+    } else {
+      // Regular users can only see assigned clients
+      clients = await sql`
+        SELECT 
+          c.id, c.name, c.industry, c.status, c.url, c.lead_dpr, 
+          c.tone_of_voice, c.spheres, c.outreach_locations, 
+          c.created_at, c.updated_at
+        FROM clients c
+        INNER JOIN client_assignments ca ON c.id = ca.client_id
+        WHERE ca.user_id = ${userId} AND ca.status = 'active'
+        ORDER BY c.name ASC
+      `;
+    }
     
     // Convert to camelCase for frontend
     const camelCaseClients = clients.map(toCamelCase);
@@ -179,6 +202,9 @@ async function handlePut(req, res) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
 
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
   // Validate input data (allowing partial updates)
   const validationErrors = validateClientData(req.body, true);
   if (validationErrors.length > 0) {
@@ -186,13 +212,23 @@ async function handlePut(req, res) {
   }
 
   try {
-    // Check if client exists
-    const existingClient = await sql`
-      SELECT id FROM clients WHERE id = ${clientId}
-    `;
+    // Check if client exists and user has access
+    let existingClient;
+    
+    if (['admin', 'dpr_manager'].includes(userRole)) {
+      existingClient = await sql`
+        SELECT id FROM clients WHERE id = ${clientId}
+      `;
+    } else {
+      existingClient = await sql`
+        SELECT c.id FROM clients c
+        INNER JOIN client_assignments ca ON c.id = ca.client_id
+        WHERE c.id = ${clientId} AND ca.user_id = ${userId} AND ca.status = 'active'
+      `;
+    }
 
     if (existingClient.length === 0) {
-      return res.status(404).json({ error: 'Client not found' });
+      return res.status(404).json({ error: 'Client not found or access denied' });
     }
 
     // Prepare update data (only include provided fields)
@@ -253,6 +289,14 @@ async function handleDelete(req, res) {
   const clientId = parseInt(req.body.id);
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
+  }
+
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  // Only admins can delete clients
+  if (!['admin'].includes(userRole)) {
+    return res.status(403).json({ error: 'Insufficient permissions to delete clients' });
   }
 
   try {

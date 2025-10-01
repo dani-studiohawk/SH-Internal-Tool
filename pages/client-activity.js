@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { secureStore } from '../lib/secure-storage';
 
 export default function ClientActivity() {
   const [client, setClient] = useState(null);
@@ -126,8 +127,8 @@ export default function ClientActivity() {
 
   const useAgain = (type, item) => {
     if (type === 'trends') {
-      // Store trend data and navigate to ideation assistant
-      localStorage.setItem('trendData', JSON.stringify(item));
+      // Store trend data securely and navigate to ideation assistant
+      secureStore('trendData', item);
       router.push('/ideation-assistant');
     } else if (type === 'ideas') {
       // Navigate to PR writing assistant with idea data
@@ -139,7 +140,7 @@ export default function ClientActivity() {
         clientData: item.clientData,
         context: item.context
       };
-      localStorage.setItem('storyData', JSON.stringify(storyData));
+      secureStore('storyData', storyData);
       router.push('/pr-writing-assistant');
     } else if (type === 'prs') {
       // Navigate to PR writing assistant with existing PR data for editing
@@ -152,7 +153,7 @@ export default function ClientActivity() {
         context: `Editing saved press release: ${item.headline}`,
         existingContent: item.content // Pass the existing content
       };
-      localStorage.setItem('storyData', JSON.stringify(storyData));
+      secureStore('storyData', storyData);
       router.push('/pr-writing-assistant');
     }
   };

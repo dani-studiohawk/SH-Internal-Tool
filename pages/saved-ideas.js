@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { secureStore, secureRetrieve, migrateFromLocalStorage } from '../lib/secure-storage';
 
 export default function SavedIdeas() {
   const [savedIdeas, setSavedIdeas] = useState([]);
@@ -29,18 +30,24 @@ export default function SavedIdeas() {
         const clientsData = await response.json();
         setClients(clientsData);
       } else {
-        // Fallback to localStorage
-        const stored = localStorage.getItem('clients');
+        // Fallback to secure storage, migrating from localStorage if needed
+        let stored = secureRetrieve('clients');
+        if (!stored) {
+          stored = migrateFromLocalStorage('clients');
+        }
         if (stored) {
-          setClients(JSON.parse(stored));
+          setClients(stored);
         }
       }
     } catch (error) {
       console.error('Error loading clients:', error);
-      // Fallback to localStorage
-      const stored = localStorage.getItem('clients');
+      // Fallback to secure storage, migrating from localStorage if needed
+      let stored = secureRetrieve('clients');
+      if (!stored) {
+        stored = migrateFromLocalStorage('clients');
+      }
       if (stored) {
-        setClients(JSON.parse(stored));
+        setClients(stored);
       }
     }
   };
@@ -58,10 +65,13 @@ export default function SavedIdeas() {
     } catch (error) {
       console.error('Error loading saved ideas:', error);
       setError('Failed to load saved ideas. Please try again.');
-      // Fallback to localStorage for backward compatibility
-      const saved = localStorage.getItem('savedIdeas');
+      // Fallback to secure storage for backward compatibility, migrating from localStorage if needed
+      let saved = secureRetrieve('savedIdeas');
+      if (!saved) {
+        saved = migrateFromLocalStorage('savedIdeas');
+      }
       if (saved) {
-        setSavedIdeas(JSON.parse(saved));
+        setSavedIdeas(saved);
       }
     } finally {
       setLoading(false);
@@ -77,8 +87,8 @@ export default function SavedIdeas() {
       });
 
   const selectIdea = (idea) => {
-    // Store the selected idea data
-    localStorage.setItem('storyData', JSON.stringify(idea));
+    // Store the selected idea data securely
+    secureStore('storyData', idea);
     // Navigate back to PR Writing Assistant
     router.push('/pr-writing-assistant');
   };
@@ -98,8 +108,8 @@ export default function SavedIdeas() {
       const updatedIdeas = savedIdeas.filter(idea => idea.id !== ideaId);
       setSavedIdeas(updatedIdeas);
       
-      // Also remove from localStorage for backward compatibility
-      localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
+      // Also update secure storage for backward compatibility
+      secureStore('savedIdeas', updatedIdeas);
     } catch (error) {
       console.error('Error deleting idea:', error);
       alert('Failed to delete idea. Please try again.');

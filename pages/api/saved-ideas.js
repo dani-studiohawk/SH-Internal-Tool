@@ -9,15 +9,36 @@ async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const ideas = await sql`
-        SELECT 
-          si.*,
-          c.name as client_name,
-          c.industry as client_industry
-        FROM saved_ideas si
-        LEFT JOIN clients c ON si.client_id = c.id
-        ORDER BY si.created_at DESC
-      `;
+      const userId = req.user.id;
+      const userRole = req.user.role;
+
+      let ideas;
+      
+      // Admin and DPR managers can see all ideas
+      if (['admin', 'dpr_manager'].includes(userRole)) {
+        ideas = await sql`
+          SELECT 
+            si.id, si.client_id, si.headline, si.summary, si.sources,
+            si.campaign_type, si.context, si.client_data, si.created_at,
+            c.name as client_name, c.industry as client_industry
+          FROM saved_ideas si
+          LEFT JOIN clients c ON si.client_id = c.id
+          ORDER BY si.created_at DESC
+        `;
+      } else {
+        // Regular users can only see ideas for their assigned clients
+        ideas = await sql`
+          SELECT 
+            si.id, si.client_id, si.headline, si.summary, si.sources,
+            si.campaign_type, si.context, si.client_data, si.created_at,
+            c.name as client_name, c.industry as client_industry
+          FROM saved_ideas si
+          LEFT JOIN clients c ON si.client_id = c.id
+          LEFT JOIN client_assignments ca ON c.id = ca.client_id
+          WHERE (ca.user_id = ${userId} AND ca.status = 'active') OR si.client_id IS NULL
+          ORDER BY si.created_at DESC
+        `;
+      }
       
       // Transform the data to match the current frontend format
       const transformedIdeas = ideas.map(idea => ({

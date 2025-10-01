@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
+import { secureRetrieve, migrateFromLocalStorage } from '../lib/secure-storage';
 
 export default function Dashboard() {
   const [clientCount, setClientCount] = useState(0);
@@ -21,20 +22,30 @@ export default function Dashboard() {
         const activeClients = clients.filter(client => client.status === 'active');
         setClientCount(activeClients.length);
       } else {
-        // Fallback to localStorage if API fails
+        // Fallback to secure storage if API fails, migrating from localStorage if needed
         if (typeof window !== 'undefined') {
-          const clients = JSON.parse(localStorage.getItem('clients') || '[]');
-          const activeClients = clients.filter(client => client.status === 'active');
-          setClientCount(activeClients.length);
+          let clients = secureRetrieve('clients');
+          if (!clients) {
+            clients = migrateFromLocalStorage('clients');
+          }
+          if (clients) {
+            const activeClients = clients.filter(client => client.status === 'active');
+            setClientCount(activeClients.length);
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching client count:', error);
-      // Fallback to localStorage
+      // Fallback to secure storage, migrating from localStorage if needed
       if (typeof window !== 'undefined') {
-        const clients = JSON.parse(localStorage.getItem('clients') || '[]');
-        const activeClients = clients.filter(client => client.status === 'active');
-        setClientCount(activeClients.length);
+        let clients = secureRetrieve('clients');
+        if (!clients) {
+          clients = migrateFromLocalStorage('clients');
+        }
+        if (clients) {
+          const activeClients = clients.filter(client => client.status === 'active');
+          setClientCount(activeClients.length);
+        }
       }
     }
   };

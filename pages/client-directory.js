@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getClients, createClient, updateClient, deleteClient } from '../lib/api';
 
@@ -7,10 +8,14 @@ export default function ClientDirectory() {
   // React Query client for cache management
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { data: session } = useSession();
   
   // Component state (preserved from original)
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const [showMyClientsOnly, setShowMyClientsOnly] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedClientForAssignment, setSelectedClientForAssignment] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     industry: '',
@@ -35,6 +40,30 @@ export default function ClientDirectory() {
     queryFn: getClients,
     // Additional options can be set here to override defaults
   });
+
+  // Fetch all users for assignment
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      return response.json();
+    },
+    enabled: !!session?.user?.role && ['admin', 'dpr_manager'].includes(session.user.role)
+  });
+
+  // Fetch client assignments
+  const { data: assignments = [] } = useQuery({
+    queryKey: ['client-assignments'],
+    queryFn: async () => {
+      const response = await fetch('/api/client-assignments');
+      if (!response.ok) throw new Error('Failed to fetch assignments');
+      return response.json();
+    }
+  });
+
+  // Check if current user can manage assignments
+  const canManageAssignments = session?.user?.role && ['admin', 'dpr_manager'].includes(session.user.role);
 
   // React Query: Create client mutation with optimistic updates
   const createClientMutation = useMutation({
@@ -89,6 +118,70 @@ export default function ClientDirectory() {
       alert(`Failed to delete client: ${error.message}`);
     }
   });
+
+  // Assignment mutations
+  const assignClientMutation = useMutation({
+    mutationFn: async ({ clientId, userId }) => {
+      const response = await fetch('/api/client-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, userId })
+      });
+      if (!response.ok) throw new Error('Failed to assign client');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['client-assignments']);
+    }
+  });
+
+  const unassignClientMutation = useMutation({
+    mutationFn: async ({ clientId, userId }) => {
+      const response = await fetch(`/api/client-assignments?clientId=${clientId}&userId=${userId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to unassign client');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['client-assignments']);
+    }
+  });
+
+  // Helper functions for client assignments
+  const getClientAssignments = (clientId) => {
+    return assignments?.filter(assignment => assignment.client_id === clientId) || [];
+  };
+
+  const isUserAssignedToClient = (clientId, userId) => {
+    return assignments?.some(assignment => 
+      assignment.client_id === clientId && assignment.user_id === userId
+    ) || false;
+  };
+
+  const isClientAssignedToCurrentUser = (clientId) => {
+    return session?.user?.id && isUserAssignedToClient(clientId, session.user.id);
+  };
+
+  const getFilteredClients = () => {
+    if (!showMyClientsOnly || !session?.user?.id) {
+      return clients;
+    }
+    return clients.filter(client => isClientAssignedToCurrentUser(client.id));
+  };
+
+  const handleAssignUser = (clientId, userId) => {
+    assignClientMutation.mutate({ clientId, userId });
+  };
+
+  const handleUnassignUser = (clientId, userId) => {
+    unassignClientMutation.mutate({ clientId, userId });
+  };
+
+  const openAssignmentModal = (client) => {
+    setSelectedClientForAssignment(client);
+    setShowAssignmentModal(true);
+  };
 
   // Form submission handler - updated to use mutations
   const handleSubmit = async (e) => {
@@ -233,14 +326,54 @@ export default function ClientDirectory() {
           <h1>Client Directory</h1>
           <p className="text-muted">Manage your client information and project details</p>
         </div>
-        <button 
-          onClick={() => setShowForm(true)}
-          disabled={createClientMutation.isLoading}
-          style={{ opacity: createClientMutation.isLoading ? 0.6 : 1 }}
-        >
-          {createClientMutation.isLoading ? '⏳ Adding...' : '✨ Add New Client'}
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* My Clients Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.9rem', color: '#718096' }}>
+              Show only my clients
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowMyClientsOnly(!showMyClientsOnly)}
+              style={{
+                background: showMyClientsOnly ? 'var(--accent-color)' : '#e2e8f0',
+                color: showMyClientsOnly ? 'white' : '#718096',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {showMyClientsOnly ? '✓ My Clients' : 'All Clients'}
+            </button>
+          </div>
+          
+          <button 
+            onClick={() => setShowForm(true)}
+            disabled={createClientMutation.isLoading}
+            style={{ opacity: createClientMutation.isLoading ? 0.6 : 1 }}
+          >
+            {createClientMutation.isLoading ? '⏳ Adding...' : '✨ Add New Client'}
+          </button>
+        </div>
       </div>
+
+      {/* Filter Status */}
+      {showMyClientsOnly && (
+        <div style={{ 
+          background: 'rgba(0, 201, 255, 0.1)', 
+          border: '1px solid rgba(0, 201, 255, 0.3)',
+          borderRadius: '8px',
+          padding: '0.75rem 1rem',
+          marginBottom: '1rem',
+          fontSize: '0.9rem',
+          color: '#0099cc'
+        }}>
+          📋 Showing {getFilteredClients().length} of {clients.length} clients assigned to you
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit}>
@@ -387,19 +520,52 @@ export default function ClientDirectory() {
         </form>
       )}
 
-      {clients.length === 0 ? (
+      {getFilteredClients().length === 0 ? (
         <div className="card text-center" style={{ padding: '3rem', marginTop: '2rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
-          <h3>No clients yet</h3>
-          <p className="text-muted">Start by adding your first client to get organized!</p>
-          <button onClick={() => setShowForm(true)}>Add Your First Client</button>
+          <h3>{showMyClientsOnly ? 'No assigned clients' : 'No clients yet'}</h3>
+          <p className="text-muted">
+            {showMyClientsOnly 
+              ? 'You haven\'t been assigned to any clients yet.' 
+              : 'Start by adding your first client to get organized!'
+            }
+          </p>
+          {!showMyClientsOnly && (
+            <button onClick={() => setShowForm(true)}>Add Your First Client</button>
+          )}
         </div>
       ) : (
         <div className="grid grid-auto-fill">
-          {clients.sort((a,b) => a.name.localeCompare(b.name)).map(client => (
-            <div key={client.id} className="card">
+          {getFilteredClients().sort((a,b) => a.name.localeCompare(b.name)).map(client => {
+            const clientAssignments = getClientAssignments(client.id);
+            const isAssignedToMe = isClientAssignedToCurrentUser(client.id);
+            
+            return (
+            <div key={client.id} className="card" style={{ 
+              border: isAssignedToMe ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+              position: 'relative'
+            }}>
+              {/* Assignment Indicator */}
+              {isAssignedToMe && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-1px',
+                  right: '-1px',
+                  background: 'var(--accent-color)',
+                  color: 'white',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0 12px 0 12px',
+                  fontSize: '0.7rem',
+                  fontWeight: '600'
+                }}>
+                  ASSIGNED
+                </div>
+              )}
+              
               <div className="flex-between" style={{ marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>{client.name}</h3>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', paddingRight: isAssignedToMe ? '80px' : '0' }}>
+                  {client.name}
+                </h3>
                 <span 
                   style={{ 
                     padding: '0.25rem 0.75rem',
@@ -491,6 +657,60 @@ export default function ClientDirectory() {
                 );
               })()}
 
+              {/* Assignment Section */}
+              {clientAssignments.length > 0 && (
+                <div style={{ 
+                  backgroundColor: 'rgba(0, 201, 255, 0.05)', 
+                  padding: '0.75rem', 
+                  borderRadius: 'var(--border-radius)',
+                  marginTop: '1rem',
+                  marginBottom: '1rem'
+                }}>
+                  <div className="text-sm" style={{ marginBottom: '0.5rem', fontWeight: '500', color: 'var(--accent-color)' }}>
+                    👥 Assigned Team Members:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {clientAssignments.map(assignment => (
+                      <span 
+                        key={assignment.id}
+                        style={{ 
+                          background: 'white',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          color: 'var(--accent-color)',
+                          border: '1px solid rgba(0, 201, 255, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}
+                      >
+                        <span>{assignment.user_name}</span>
+                        {canManageAssignments && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnassignUser(client.id, assignment.user_id);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#dc3545',
+                              cursor: 'pointer',
+                              padding: '0',
+                              fontSize: '0.7rem'
+                            }}
+                            title="Remove assignment"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                 <button 
                   onClick={() => router.push(`/client-activity?clientId=${client.id}`)}
@@ -519,6 +739,15 @@ export default function ClientDirectory() {
                 >
                   ✏️ Edit
                 </button>
+                {canManageAssignments && (
+                  <button
+                    onClick={() => openAssignmentModal(client)}
+                    className="secondary"
+                    style={{ fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                  >
+                    👥 Assign
+                  </button>
+                )}
                 <button 
                   onClick={() => handleDeleteClient(client.id)}
                   className="danger"
@@ -533,7 +762,140 @@ export default function ClientDirectory() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+
+      {/* Assignment Modal */}
+      {showAssignmentModal && selectedClientForAssignment && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{ margin: 0 }}>
+                Assign Team Members to {selectedClientForAssignment.name}
+              </h3>
+              <button
+                onClick={() => setShowAssignmentModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#718096',
+                  padding: '0.25rem'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {users.map(user => {
+                const isAssigned = isUserAssignedToClient(selectedClientForAssignment.id, user.id);
+                
+                return (
+                  <div 
+                    key={user.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '1rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      background: isAssigned ? 'rgba(0, 201, 255, 0.05)' : 'white'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      {user.image ? (
+                        <img 
+                          src={user.image} 
+                          alt={user.name}
+                          style={{
+                            width: '2.5rem',
+                            height: '2.5rem',
+                            borderRadius: '50%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '2.5rem',
+                          height: '2.5rem',
+                          borderRadius: '50%',
+                          background: 'var(--accent-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: '600'
+                        }}>
+                          {user.name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                      
+                      <div>
+                        <div style={{ fontWeight: '500', color: '#2d3748' }}>
+                          {user.name}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#718096' }}>
+                          {user.email} • {user.role?.replace('_', ' ')?.toUpperCase()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (isAssigned) {
+                          handleUnassignUser(selectedClientForAssignment.id, user.id);
+                        } else {
+                          handleAssignUser(selectedClientForAssignment.id, user.id);
+                        }
+                      }}
+                      disabled={assignClientMutation.isLoading || unassignClientMutation.isLoading}
+                      style={{
+                        background: isAssigned ? '#dc3545' : 'var(--accent-color)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        opacity: (assignClientMutation.isLoading || unassignClientMutation.isLoading) ? 0.6 : 1
+                      }}
+                    >
+                      {isAssigned ? 'Remove' : 'Assign'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

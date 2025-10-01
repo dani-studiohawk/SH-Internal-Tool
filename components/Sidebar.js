@@ -65,10 +65,14 @@ export default function Sidebar() {
           <ul>
             <li><Link href="/" className={router.pathname === '/' ? styles.active : ''}>📊 Dashboard</Link></li>
             <li><Link href="/client-directory" className={router.pathname === '/client-directory' ? styles.active : ''}>👥 Client Directory</Link></li>
+            {session?.user?.role && ['admin', 'dpr_manager'].includes(session.user.role) && (
+              <li><Link href="/user-management" className={router.pathname === '/user-management' ? styles.active : ''}>🔧 User Management</Link></li>
+            )}
             <li><Link href="/trend-assistant" className={router.pathname === '/trend-assistant' ? styles.active : ''}>📈 Trend Assistant</Link></li>
             <li><Link href="/ideation-assistant" className={router.pathname === '/ideation-assistant' ? styles.active : ''}>💡 Ideation Assistant</Link></li>
             <li><Link href="/headline-assistant" className={router.pathname === '/headline-assistant' ? styles.active : ''}>📰 Headline Assistant</Link></li>
             <li><Link href="/pr-writing-assistant" className={router.pathname === '/pr-writing-assistant' ? styles.active : ''}>✍️ PR Writing Assistant</Link></li>
+            <li><Link href="/usage-dashboard" className={router.pathname === '/usage-dashboard' ? styles.active : ''}>📊 API Usage</Link></li>
             <li><Link href="/alerts" className={router.pathname === '/alerts' ? styles.active : ''}>🔔 Alerts</Link></li>
             <li><Link href="/settings" className={router.pathname === '/settings' ? styles.active : ''}>⚙️ Settings</Link></li>
           </ul>

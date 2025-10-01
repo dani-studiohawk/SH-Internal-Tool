@@ -10,12 +10,25 @@ async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const { clientId } = req.query;
+      const userId = req.user.id;
+      const userRole = req.user.role;
       
       let savedTrends = [];
       let clientActivityTrends = [];
 
       // Get trends from saved_trends table
       if (clientId) {
+        // Verify user has access to this specific client
+        if (!['admin', 'dpr_manager'].includes(userRole)) {
+          const hasAccess = await sql`
+            SELECT 1 FROM client_assignments 
+            WHERE client_id = ${clientId} AND user_id = ${userId} AND status = 'active'
+          `;
+          if (hasAccess.length === 0) {
+            return res.status(403).json({ error: 'Access denied to this client' });
+          }
+        }
+
         savedTrends = await sql`
           SELECT 
             st.*,
@@ -41,29 +54,57 @@ async function handler(req, res) {
           ORDER BY ca.created_at DESC
         `;
       } else {
-        savedTrends = await sql`
-          SELECT 
-            st.*,
-            c.name as client_name,
-            c.industry as client_industry,
-            'saved_trend' as source_type
-          FROM saved_trends st
-          LEFT JOIN clients c ON st.client_id = c.id
-          ORDER BY st.created_at DESC
-        `;
+        // Get all trends user has access to
+        if (['admin', 'dpr_manager'].includes(userRole)) {
+          savedTrends = await sql`
+            SELECT 
+              st.*,
+              c.name as client_name,
+              c.industry as client_industry,
+              'saved_trend' as source_type
+            FROM saved_trends st
+            LEFT JOIN clients c ON st.client_id = c.id
+            ORDER BY st.created_at DESC
+          `;
 
-        // Get trends from client_activity table
-        clientActivityTrends = await sql`
-          SELECT 
-            ca.*,
-            c.name as client_name,
-            c.industry as client_industry,
-            'client_activity' as source_type
-          FROM client_activity ca
-          LEFT JOIN clients c ON ca.client_id = c.id
-          WHERE ca.activity_type = 'trend'
-          ORDER BY ca.created_at DESC
-        `;
+          clientActivityTrends = await sql`
+            SELECT 
+              ca.*,
+              c.name as client_name,
+              c.industry as client_industry,
+              'client_activity' as source_type
+            FROM client_activity ca
+            LEFT JOIN clients c ON ca.client_id = c.id
+            WHERE ca.activity_type = 'trend'
+            ORDER BY ca.created_at DESC
+          `;
+        } else {
+          savedTrends = await sql`
+            SELECT 
+              st.*,
+              c.name as client_name,
+              c.industry as client_industry,
+              'saved_trend' as source_type
+            FROM saved_trends st
+            LEFT JOIN clients c ON st.client_id = c.id
+            INNER JOIN client_assignments cas ON c.id = cas.client_id 
+            WHERE cas.user_id = ${userId} AND cas.status = 'active'
+            ORDER BY st.created_at DESC
+          `;
+
+          clientActivityTrends = await sql`
+            SELECT 
+              ca.*,
+              c.name as client_name,
+              c.industry as client_industry,
+              'client_activity' as source_type
+            FROM client_activity ca
+            LEFT JOIN clients c ON ca.client_id = c.id
+            INNER JOIN client_assignments cas ON c.id = cas.client_id
+            WHERE ca.activity_type = 'trend' AND cas.user_id = ${userId} AND cas.status = 'active'
+            ORDER BY ca.created_at DESC
+          `;
+        }
       }
 
       // Transform client activity trends to match saved trends format

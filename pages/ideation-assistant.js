@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { secureRetrieve, secureRemove, migrateFromLocalStorage } from '../lib/secure-storage';
 
 export default function IdeationAssistant() {
   const [selectionMode, setSelectionMode] = useState('brief'); // 'client', 'topic', 'brief', 'trend'
@@ -30,18 +31,21 @@ export default function IdeationAssistant() {
   ];
 
   useEffect(() => {
-    const stored = localStorage.getItem('clients');
+    // Load clients with migration from localStorage if needed
+    let stored = secureRetrieve('clients');
+    if (!stored) {
+      stored = migrateFromLocalStorage('clients');
+    }
     if (stored) {
-      setClients(JSON.parse(stored));
+      setClients(stored);
     }
 
     // Check for trend data from Trend Assistant
-    const trendData = localStorage.getItem('trendData');
+    const trendData = secureRetrieve('trendData');
     if (trendData) {
-      const data = JSON.parse(trendData);
       setSelectionMode('trend');
-      setSelectedTrend(data);
-      localStorage.removeItem('trendData'); // Clear it after loading
+      setSelectedTrend(trendData);
+      secureRemove('trendData'); // Clear it after loading
     }
   }, []);
 
