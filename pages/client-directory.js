@@ -405,6 +405,20 @@ export default function ClientDirectory() {
                   📋 View Activity
                 </button>
                 <button 
+                  onClick={() => router.push(`/saved-ideas?clientId=${client.id}`)}
+                  style={{ flex: 1, minWidth: '120px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                >
+                  💡 Saved Ideas
+                </button>
+                <button 
+                  onClick={() => router.push(`/saved-trends?clientId=${client.id}`)}
+                  style={{ flex: 1, minWidth: '120px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}
+                >
+                  📊 Saved Trends
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                <button 
                   onClick={() => editClient(client)}
                   className="secondary"
                   style={{ flex: 1, minWidth: '100px', fontSize: '0.875rem', padding: '0.75rem 1rem' }}

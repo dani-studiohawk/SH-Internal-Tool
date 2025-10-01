@@ -11,25 +11,81 @@ export default function TrendDetail() {
 
   useEffect(() => {
     if (trendId && clientId) {
-      // Load trend data from localStorage or API
-      const storedTrends = localStorage.getItem(`trends_${clientId}`);
-      const storedArticles = localStorage.getItem(`articles_${clientId}`);
-      const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
-
-      if (storedTrends && storedArticles) {
-        const trends = JSON.parse(storedTrends);
-        const articlesData = JSON.parse(storedArticles);
-
-        const foundTrend = trends.find(t => t.id == trendId);
-        if (foundTrend) {
-          setTrend(foundTrend);
-          setArticles(articlesData);
-          setKeyword(storedKeyword || '');
-        }
-      }
-      setLoading(false);
+      loadTrendData();
     }
   }, [trendId, clientId]);
+
+  const loadTrendData = async () => {
+    try {
+      // Try to load from database first
+      const response = await fetch(`/api/trend-analyses?clientId=${clientId}`);
+      if (response.ok) {
+        const analyses = await response.json();
+        if (analyses.length > 0) {
+          const analysis = analyses[0]; // Get the most recent analysis
+          const foundTrend = analysis.trends.find(t => t.id == trendId);
+          if (foundTrend) {
+            setTrend(foundTrend);
+            setArticles(analysis.articles);
+            setKeyword(analysis.keyword);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading from database:', error);
+    }
+
+    // Fallback to localStorage
+    const storedTrends = localStorage.getItem(`trends_${clientId}`);
+    const storedArticles = localStorage.getItem(`articles_${clientId}`);
+    const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
+
+    if (storedTrends && storedArticles) {
+      const trends = JSON.parse(storedTrends);
+      const articlesData = JSON.parse(storedArticles);
+
+      const foundTrend = trends.find(t => t.id == trendId);
+      if (foundTrend) {
+        setTrend(foundTrend);
+        setArticles(articlesData);
+        setKeyword(storedKeyword || '');
+      }
+    }
+    setLoading(false);
+  };
+
+  const saveTrend = async () => {
+    try {
+      const response = await fetch('/api/saved-trends', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          clientId: clientId !== 'custom' ? clientId : null,
+          title: trend.title,
+          description: trend.description,
+          trendData: {
+            ...trend,
+            keyword,
+            analyzedAt: trend.analyzedAt
+          },
+          articles: articles
+        })
+      });
+
+      if (response.ok) {
+        alert('✅ Trend saved successfully!\n\nYou can find this in "Saved Trends" for this client.');
+      } else {
+        throw new Error('Failed to save trend');
+      }
+    } catch (error) {
+      console.error('Error saving trend:', error);
+      alert('❌ Failed to save trend. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -116,6 +172,13 @@ export default function TrendDetail() {
           style={{ flex: 1, padding: '1rem' }}
         >
           💡 Generate Ideas
+        </button>
+        <button 
+          onClick={saveTrend}
+          className="secondary" 
+          style={{ padding: '1rem' }}
+        >
+          📌 Save Trend
         </button>
         <button 
           className="secondary" 

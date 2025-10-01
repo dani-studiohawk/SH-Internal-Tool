@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-export default function SavedIdeas() {
-  const [savedIdeas, setSavedIdeas] = useState([]);
+export default function SavedTrends() {
+  const [savedTrends, setSavedTrends] = useState([]);
   const [clients, setClients] = useState([]);
   const [selectedClientId, setSelectedClientId] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -11,7 +11,7 @@ export default function SavedIdeas() {
 
   useEffect(() => {
     loadClients();
-    loadSavedIdeas();
+    loadSavedTrends();
   }, []);
 
   useEffect(() => {
@@ -45,73 +45,73 @@ export default function SavedIdeas() {
     }
   };
 
-  const loadSavedIdeas = async () => {
+  const loadSavedTrends = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/saved-ideas');
+      const response = await fetch('/api/saved-trends');
       if (!response.ok) {
-        throw new Error('Failed to load saved ideas');
+        throw new Error('Failed to load saved trends');
       }
-      const ideas = await response.json();
-      setSavedIdeas(ideas);
+      const trends = await response.json();
+      setSavedTrends(trends);
     } catch (error) {
-      console.error('Error loading saved ideas:', error);
-      setError('Failed to load saved ideas. Please try again.');
-      // Fallback to localStorage for backward compatibility
-      const saved = localStorage.getItem('savedIdeas');
-      if (saved) {
-        setSavedIdeas(JSON.parse(saved));
-      }
+      console.error('Error loading saved trends:', error);
+      setError('Failed to load saved trends. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter ideas based on selected client
-  const filteredIdeas = selectedClientId === 'all' 
-    ? savedIdeas 
-    : savedIdeas.filter(idea => {
-        if (!idea.clientData) return selectedClientId === 'no-client';
-        return idea.clientData.id == selectedClientId;
+  // Filter trends based on selected client
+  const filteredTrends = selectedClientId === 'all' 
+    ? savedTrends 
+    : savedTrends.filter(trend => {
+        const trendClientId = trend.client_id || trend.clientId;
+        if (!trendClientId) return selectedClientId === 'no-client';
+        return trendClientId == selectedClientId;
       });
 
-  const selectIdea = (idea) => {
-    // Store the selected idea data
-    localStorage.setItem('storyData', JSON.stringify(idea));
-    // Navigate back to PR Writing Assistant
-    router.push('/pr-writing-assistant');
-  };
+  const deleteTrend = async (trendId, e) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this saved trend?')) {
+      return;
+    }
 
-  const deleteIdea = async (ideaId, e) => {
-    e.stopPropagation(); // Prevent triggering selectIdea
     try {
-      const response = await fetch(`/api/saved-ideas?id=${ideaId}`, {
+      const response = await fetch(`/api/saved-trends?id=${trendId}`, {
         method: 'DELETE'
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete idea');
+        throw new Error('Failed to delete trend');
       }
       
       // Update local state
-      const updatedIdeas = savedIdeas.filter(idea => idea.id !== ideaId);
-      setSavedIdeas(updatedIdeas);
-      
-      // Also remove from localStorage for backward compatibility
-      localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
+      const updatedTrends = savedTrends.filter(trend => trend.id !== trendId);
+      setSavedTrends(updatedTrends);
     } catch (error) {
-      console.error('Error deleting idea:', error);
-      alert('Failed to delete idea. Please try again.');
+      console.error('Error deleting trend:', error);
+      alert('Failed to delete trend. Please try again.');
     }
+  };
+
+  const useForIdeas = (trend) => {
+    // Store trend data for ideation assistant
+    const trendData = trend.source_type === 'client_activity' 
+      ? trend.trend_data 
+      : trend.trend_data;
+    localStorage.setItem('trendData', JSON.stringify(trendData));
+    // Navigate to ideation assistant
+    router.push('/ideation-assistant');
   };
 
   return (
     <div>
       <div className="flex-between mb-4">
         <div>
-          <h1>Saved Ideas</h1>
-          <p className="text-muted">Browse and select from your saved ideas</p>
+          <h1>Saved Trends</h1>
+          <p className="text-muted">Browse and use your saved trend analyses</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
           {selectedClientId !== 'all' && selectedClientId !== 'no-client' && clients.find(c => c.id == selectedClientId) && (
@@ -123,8 +123,8 @@ export default function SavedIdeas() {
               👥 Back to Clients
             </button>
           )}
-          <button onClick={() => router.push('/pr-writing-assistant')} className="secondary">
-            ← Back to PR Writer
+          <button onClick={() => router.push('/trend-assistant')} className="secondary">
+            ← Back to Trend Assistant
           </button>
         </div>
       </div>
@@ -148,11 +148,11 @@ export default function SavedIdeas() {
                 minWidth: '200px'
               }}
             >
-              <option value="all">All Ideas ({savedIdeas.length})</option>
-              <option value="no-client">No Client Assigned ({savedIdeas.filter(idea => !idea.clientData).length})</option>
+              <option value="all">All Trends ({savedTrends.length})</option>
+              <option value="no-client">No Client Assigned ({savedTrends.filter(trend => !trend.client_id && !trend.clientId).length})</option>
               {clients.map(client => (
                 <option key={client.id} value={client.id}>
-                  {client.name} ({savedIdeas.filter(idea => idea.clientData?.id == client.id).length})
+                  {client.name} ({savedTrends.filter(trend => (trend.client_id || trend.clientId) == client.id).length})
                 </option>
               ))}
             </select>
@@ -163,42 +163,42 @@ export default function SavedIdeas() {
       {loading ? (
         <div className="card text-center" style={{ padding: '3rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏳</div>
-          <h3>Loading Saved Ideas...</h3>
+          <h3>Loading Saved Trends...</h3>
         </div>
       ) : error ? (
         <div className="card text-center" style={{ padding: '3rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-          <h3>Error Loading Ideas</h3>
+          <h3>Error Loading Trends</h3>
           <p className="text-muted">{error}</p>
           <button 
-            onClick={loadSavedIdeas} 
+            onClick={loadSavedTrends} 
             style={{ marginTop: '1rem' }}
           >
             Try Again
           </button>
         </div>
-      ) : filteredIdeas.length === 0 ? (
+      ) : filteredTrends.length === 0 ? (
         <div className="card text-center" style={{ padding: '3rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💡</div>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
           <h3>
             {selectedClientId === 'all' 
-              ? 'No Saved Ideas Yet' 
+              ? 'No Saved Trends Yet' 
               : selectedClientId === 'no-client'
-              ? 'No Ideas Without Client Assignment'
-              : `No Ideas for ${clients.find(c => c.id == selectedClientId)?.name || 'This Client'}`
+              ? 'No Trends Without Client Assignment'
+              : `No Trends for ${clients.find(c => c.id == selectedClientId)?.name || 'This Client'}`
             }
           </h3>
           <p className="text-muted">
             {selectedClientId === 'all' 
-              ? 'Save ideas from the Ideation Assistant to access them here.'
-              : 'Try selecting a different client or create new ideas.'
+              ? 'Save trends from the Trend Assistant to access them here.'
+              : 'Try selecting a different client or analyze new trends.'
             }
             <br />
             <button
-              onClick={() => router.push('/ideation-assistant')}
+              onClick={() => router.push('/trend-assistant')}
               style={{ marginTop: '1rem' }}
             >
-              Go to Ideation Assistant →
+              Go to Trend Assistant →
             </button>
           </p>
         </div>
@@ -206,61 +206,84 @@ export default function SavedIdeas() {
         <>
           <div className="flex-between mb-4">
             <span className="text-muted">
-              {filteredIdeas.length} 
+              {filteredTrends.length} 
               {selectedClientId === 'all' 
-                ? ' saved ideas' 
+                ? ' saved trends' 
                 : selectedClientId === 'no-client'
-                ? ' ideas without client assignment'
-                : ` ideas for ${clients.find(c => c.id == selectedClientId)?.name || 'this client'}`
+                ? ' trends without client assignment'
+                : ` trends for ${clients.find(c => c.id == selectedClientId)?.name || 'this client'}`
               }
             </span>
           </div>
 
           <div className="grid grid-auto-fill">
-            {filteredIdeas.map(idea => (
+            {filteredTrends.map(trend => (
               <div
-                key={idea.id}
+                key={trend.id}
                 className="card"
                 style={{ cursor: 'pointer' }}
-                onClick={() => selectIdea(idea)}
               >
                 <div style={{ marginBottom: '1rem' }}>
-                  <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>
-                    {idea.headline}
-                  </h3>
-                  <p className="text-muted" style={{ marginBottom: '1rem' }}>
-                    {idea.summary}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <h3 style={{ color: 'var(--primary-color)', margin: 0 }}>
+                      {trend.title}
+                    </h3>
+                    <span 
+                      style={{ 
+                        fontSize: '0.75rem', 
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '12px',
+                        backgroundColor: trend.source_type === 'client_activity' ? 'var(--accent-color)' : 'var(--secondary-color)',
+                        color: 'var(--text-color)'
+                      }}
+                    >
+                      {trend.source_type === 'client_activity' ? '📋 Activity' : '📌 Saved'}
+                    </span>
+                  </div>
+                  {trend.description && (
+                    <p className="text-muted" style={{ marginBottom: '1rem' }}>
+                      {trend.description.length > 150 
+                        ? trend.description.substring(0, 150) + '...' 
+                        : trend.description}
+                    </p>
+                  )}
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
-                  <div className="text-sm" style={{ fontWeight: '500', marginBottom: '0.5rem' }}>
-                    Campaign Type: {idea.campaignType}
-                  </div>
-                  {idea.clientData && (
+                  {trend.client_name && (
                     <div className="text-sm text-muted" style={{ marginBottom: '0.5rem' }}>
-                      Client: {idea.clientData.name} ({idea.clientData.industry})
+                      Client: {trend.client_name} ({trend.client_industry})
                     </div>
                   )}
-                  {idea.sources && idea.sources.length > 0 && (
+                  {trend.trend_data?.keyword && (
                     <div className="text-sm" style={{ marginBottom: '0.5rem' }}>
-                      <strong>Data Sources:</strong> {idea.sources.length} available
+                      <strong>Keyword:</strong> {trend.trend_data.keyword}
+                    </div>
+                  )}
+                  {trend.trend_data?.relevanceScore && (
+                    <div className="text-sm" style={{ marginBottom: '0.5rem' }}>
+                      <strong>Relevance Score:</strong> {trend.trend_data.relevanceScore}/10
+                    </div>
+                  )}
+                  {trend.source_type === 'client_activity' && trend.trend_data?.category && (
+                    <div className="text-sm" style={{ marginBottom: '0.5rem' }}>
+                      <strong>Category:</strong> {trend.trend_data.category}
                     </div>
                   )}
                   <div className="text-sm text-muted">
-                    Saved: {new Date(idea.savedAt).toLocaleDateString()}
+                    {trend.source_type === 'client_activity' ? 'Added to Activity' : 'Saved'}: {new Date(trend.created_at).toLocaleDateString()}
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                   <button
                     style={{ flex: 1, fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-                    onClick={() => selectIdea(idea)}
+                    onClick={() => useForIdeas(trend)}
                   >
-                    📝 Use This Idea
+                    💡 Generate Ideas
                   </button>
                   <button
-                    onClick={(e) => deleteIdea(idea.id, e)}
+                    onClick={(e) => deleteTrend(trend.id, e)}
                     className="secondary"
                     style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
                   >

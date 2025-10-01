@@ -93,23 +93,65 @@ export default function PRWritingAssistant() {
     }
   }, []);
 
-  const loadSavedIdeas = () => {
-    const saved = localStorage.getItem('savedIdeas');
-    if (saved) {
-      setSavedIdeas(JSON.parse(saved));
+  const loadSavedIdeas = async () => {
+    try {
+      const response = await fetch('/api/saved-ideas');
+      if (response.ok) {
+        const ideas = await response.json();
+        setSavedIdeas(ideas);
+      } else {
+        // Fallback to localStorage
+        const saved = localStorage.getItem('savedIdeas');
+        if (saved) {
+          setSavedIdeas(JSON.parse(saved));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved ideas:', error);
+      // Fallback to localStorage
+      const saved = localStorage.getItem('savedIdeas');
+      if (saved) {
+        setSavedIdeas(JSON.parse(saved));
+      }
     }
   };
 
-  const saveIdea = (ideaData) => {
-    const newIdea = {
-      id: Date.now().toString(),
-      ...ideaData,
-      savedAt: new Date().toISOString()
-    };
-    
-    const updatedIdeas = [newIdea, ...savedIdeas];
-    setSavedIdeas(updatedIdeas);
-    localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
+  const saveIdea = async (ideaData) => {
+    try {
+      const response = await fetch('/api/saved-ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(ideaData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save idea to database');
+      }
+
+      const savedIdea = await response.json();
+
+      // Update local state
+      const updatedIdeas = [savedIdea, ...savedIdeas];
+      setSavedIdeas(updatedIdeas);
+
+      // Also update localStorage for backward compatibility
+      localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
+    } catch (error) {
+      console.error('Error saving idea:', error);
+      
+      // Fallback to localStorage only
+      const newIdea = {
+        id: Date.now().toString(),
+        ...ideaData,
+        savedAt: new Date().toISOString()
+      };
+      
+      const updatedIdeas = [newIdea, ...savedIdeas];
+      setSavedIdeas(updatedIdeas);
+      localStorage.setItem('savedIdeas', JSON.stringify(updatedIdeas));
+    }
   };
 
   const startFresh = () => {

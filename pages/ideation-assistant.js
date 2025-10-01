@@ -143,7 +143,7 @@ export default function IdeationAssistant() {
     router.push('/pr-writing-assistant');
   };
 
-  const saveIdea = (ideaTitle, ideaSummary, ideaSources) => {
+  const saveIdea = async (ideaTitle, ideaSummary, ideaSources) => {
     console.log('Save Idea clicked:', { ideaTitle, ideaSummary, ideaSources });
     try {
       // Get client data if selected
@@ -167,12 +167,27 @@ export default function IdeationAssistant() {
                  selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : ''
       };
 
-      // Save to localStorage
+      // Save to database
+      const response = await fetch('/api/saved-ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(ideaData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save idea to database');
+      }
+
+      const savedIdea = await response.json();
+
+      // Also save to localStorage for backward compatibility
       const existingIdeas = JSON.parse(localStorage.getItem('savedIdeas') || '[]');
       const newIdea = {
-        id: Date.now().toString(),
+        id: savedIdea.id,
         ...ideaData,
-        savedAt: new Date().toISOString()
+        savedAt: savedIdea.savedAt
       };
       
       existingIdeas.unshift(newIdea); // Add to beginning
@@ -182,7 +197,35 @@ export default function IdeationAssistant() {
       alert(`✅ Idea saved successfully!\n\n"${ideaTitle}"\n\nYou can access it later in the PR Writing Assistant under "Saved Ideas".`);
     } catch (error) {
       console.error('Error saving idea:', error);
-      alert('❌ Error saving idea. Please try again.');
+      
+      // Fallback to localStorage only
+      try {
+        const existingIdeas = JSON.parse(localStorage.getItem('savedIdeas') || '[]');
+        const newIdea = {
+          id: Date.now().toString(),
+          headline: ideaTitle,
+          summary: ideaSummary,
+          sources: ideaSources || [],
+          campaignType,
+          clientData: selectionMode === 'client' && selectedClient ? 
+            clients.find(c => c.id == selectedClient) : 
+            (selectionMode === 'trend' && selectedTrend && selectedTrend.clientId && selectedTrend.clientId !== "custom" ?
+            clients.find(c => c.id == selectedTrend.clientId) : null),
+          context: selectionMode === 'client' ? `Client: ${clients.find(c => c.id == selectedClient)?.name}` : 
+                   selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
+                   selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
+                   selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : '',
+          savedAt: new Date().toISOString()
+        };
+        
+        existingIdeas.unshift(newIdea);
+        localStorage.setItem('savedIdeas', JSON.stringify(existingIdeas));
+        
+        alert(`⚠️ Idea saved locally only (database unavailable)\n\n"${ideaTitle}"\n\nYou can access it later in the PR Writing Assistant under "Saved Ideas".`);
+      } catch (fallbackError) {
+        console.error('Fallback save failed:', fallbackError);
+        alert('❌ Error saving idea. Please try again.');
+      }
     }
   };
 

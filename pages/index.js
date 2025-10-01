@@ -8,11 +8,34 @@ export default function Dashboard() {
 
   useEffect(() => {
     setIsClient(true);
-    if (typeof window !== 'undefined') {
-      const clients = JSON.parse(localStorage.getItem('clients') || '[]');
-      setClientCount(clients.length);
-    }
+    fetchClientCount();
   }, []);
+
+  const fetchClientCount = async () => {
+    try {
+      const response = await fetch('/api/clients');
+      if (response.ok) {
+        const clients = await response.json();
+        const activeClients = clients.filter(client => client.status === 'active');
+        setClientCount(activeClients.length);
+      } else {
+        // Fallback to localStorage if API fails
+        if (typeof window !== 'undefined') {
+          const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+          const activeClients = clients.filter(client => client.status === 'active');
+          setClientCount(activeClients.length);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching client count:', error);
+      // Fallback to localStorage
+      if (typeof window !== 'undefined') {
+        const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+        const activeClients = clients.filter(client => client.status === 'active');
+        setClientCount(activeClients.length);
+      }
+    }
+  };
 
   return (
     <div>

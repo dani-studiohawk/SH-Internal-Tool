@@ -35,18 +35,41 @@ export default function TrendAssistant() {
 
     // If coming back from trend detail, restore the results
     if (showResults === 'true' && clientId) {
-      const storedTrends = localStorage.getItem(`trends_${clientId}`);
-      const storedArticles = localStorage.getItem(`articles_${clientId}`);
-      const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
-
-      if (storedTrends && storedArticles && storedKeyword) {
-        setTrends(JSON.parse(storedTrends));
-        setArticles(JSON.parse(storedArticles));
-        setKeyword(storedKeyword);
-        setStep('results');
-      }
+      loadStoredTrends(clientId);
     }
   }, [router.query]);
+
+  const loadStoredTrends = async (clientId) => {
+    try {
+      // Try to load from database first
+      const response = await fetch(`/api/trend-analyses?clientId=${clientId}`);
+      if (response.ok) {
+        const analyses = await response.json();
+        if (analyses.length > 0) {
+          const latest = analyses[0]; // Get the most recent analysis
+          setTrends(latest.trends);
+          setArticles(latest.articles);
+          setKeyword(latest.keyword);
+          setStep('results');
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading from database:', error);
+    }
+
+    // Fallback to localStorage
+    const storedTrends = localStorage.getItem(`trends_${clientId}`);
+    const storedArticles = localStorage.getItem(`articles_${clientId}`);
+    const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
+
+    if (storedTrends && storedArticles && storedKeyword) {
+      setTrends(JSON.parse(storedTrends));
+      setArticles(JSON.parse(storedArticles));
+      setKeyword(storedKeyword);
+      setStep('results');
+    }
+  };
 
   const analyzeTrends = async () => {
     if (!keyword.trim()) {
@@ -112,7 +135,28 @@ export default function TrendAssistant() {
       setTrends(trendsWithMetadata);
       setStep('results');
 
-      // Store for trend detail page
+      // Store in database
+      if (selectedClient) {
+        try {
+          await fetch('/api/trend-analyses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              clientId: selectedClient,
+              keyword: keyword.trim(),
+              trends: trendsWithMetadata,
+              articles: articlesToAnalyze
+            })
+          });
+        } catch (dbError) {
+          console.error('Error saving to database:', dbError);
+          // Continue with localStorage fallback
+        }
+      }
+
+      // Store for trend detail page (fallback and backward compatibility)
       const clientKey = selectedClient || 'custom';
       localStorage.setItem(`trends_${clientKey}`, JSON.stringify(trendsWithMetadata));
       localStorage.setItem(`articles_${clientKey}`, JSON.stringify(articlesToAnalyze));
@@ -192,7 +236,7 @@ export default function TrendAssistant() {
       }
 
       const savedActivity = await response.json();
-      alert(`✅ ${type.charAt(0).toUpperCase() + type.slice(1)} saved to ${client.name}'s activity!${notes ? `\n\nNotes: ${notes}` : ''}`);
+      alert(`✅ ${type.charAt(0).toUpperCase() + type.slice(1)} saved to ${client.name}'s activity!${notes ? `\n\nNotes: ${notes}` : ''}\n\nYou can also find this in the client's "Saved Trends" section.`);
     } catch (error) {
       console.error('Error saving to client activity:', error);
       alert('❌ Error saving to client activity. Please try again.');
@@ -215,11 +259,16 @@ export default function TrendAssistant() {
           <h1>🔍 Trend Assistant</h1>
           <p className="text-muted">Analyze market trends from news articles to identify opportunities</p>
         </div>
-        {step === 'results' && (
-          <button onClick={startOver} className="secondary">
-            🔄 Start New Analysis
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button onClick={() => router.push('/saved-trends')} className="secondary">
+            📊 Saved Trends
           </button>
-        )}
+          {step === 'results' && (
+            <button onClick={startOver} className="secondary">
+              🔄 Start New Analysis
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Step 1: Input */}
