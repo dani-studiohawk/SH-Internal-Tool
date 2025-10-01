@@ -186,7 +186,7 @@ export default function IdeationAssistant() {
     }
   };
 
-  const saveToClientActivity = (ideaTitle, ideaSummary, ideaSources, type = 'idea') => {
+  const saveToClientActivity = async (ideaTitle, ideaSummary, ideaSources, type = 'idea') => {
     if (clients.length === 0) {
       alert('No clients available. Please add clients first.');
       return;
@@ -223,37 +223,40 @@ export default function IdeationAssistant() {
       let clientData = client;
 
       // Prepare data to save
-      const itemData = {
-        headline: ideaTitle,
-        summary: ideaSummary,
-        sources: ideaSources || [],
-        campaignType,
-        clientData,
-        context: selectionMode === 'client' ? `Client: ${clientData?.name}` : 
-                 selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
-                 selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
-                 selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : '',
-        savedAt: new Date().toISOString(),
-        notes: notes || '',
-        clientId: selectedClientId,
-        clientName: client.name,
-        id: Date.now().toString()
+      const activityData = {
+        clientId: parseInt(selectedClientId),
+        activityType: 'idea',
+        title: ideaTitle,
+        content: {
+          headline: ideaTitle,
+          summary: ideaSummary,
+          sources: ideaSources || [],
+          campaignType,
+          clientData,
+          context: selectionMode === 'client' ? `Client: ${clientData?.name}` : 
+                   selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
+                   selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
+                   selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : '',
+          clientId: selectedClientId,
+          clientName: client.name
+        },
+        notes: notes || ''
       };
 
-      // Get existing client activity
-      const existingActivity = JSON.parse(localStorage.getItem(`client_${selectedClientId}_activity`) || '{}');
-      
-      // Initialize arrays if they don't exist
-      if (!existingActivity.savedTrends) existingActivity.savedTrends = [];
-      if (!existingActivity.savedIdeas) existingActivity.savedIdeas = [];
-      if (!existingActivity.savedPRs) existingActivity.savedPRs = [];
+      // Save to database via API
+      const response = await fetch('/api/client-activities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(activityData)
+      });
 
-      // Add to client activity
-      existingActivity.savedIdeas.unshift(itemData);
+      if (!response.ok) {
+        throw new Error('Failed to save to client activity');
+      }
 
-      // Save to client activity
-      localStorage.setItem(`client_${selectedClientId}_activity`, JSON.stringify(existingActivity));
-
+      const savedActivity = await response.json();
       alert(`✅ Idea saved to ${client.name}'s activity!\n\n"${ideaTitle}"${notes ? `\n\nNotes: ${notes}` : ''}`);
     } catch (error) {
       console.error('Error saving to client activity:', error);

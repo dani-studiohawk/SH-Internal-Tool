@@ -20,10 +20,17 @@ export default function ClientActivity() {
     }
   }, [router.query]);
 
-  const loadClientActivity = (clientId) => {
+  const loadClientActivity = async (clientId) => {
     try {
-      // Load client info
-      const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+      setLoading(true);
+      
+      // Load client info from API
+      const clientResponse = await fetch(`/api/clients?id=${clientId}`);
+      if (!clientResponse.ok) {
+        throw new Error('Failed to fetch client');
+      }
+      
+      const clients = await clientResponse.json();
       const clientInfo = clients.find(c => c.id == clientId);
       
       if (!clientInfo) {
@@ -32,15 +39,23 @@ export default function ClientActivity() {
         return;
       }
 
-      // Load client activity
-      const clientActivity = JSON.parse(localStorage.getItem(`client_${clientId}_activity`) || '{}');
+      // Load client activity from API
+      const activityResponse = await fetch(`/api/client-activities?clientId=${clientId}`);
+      if (!activityResponse.ok) {
+        throw new Error('Failed to fetch client activities');
+      }
+      
+      const activities = await activityResponse.json();
+      
+      // Organize activities by type
+      const organizedActivity = {
+        savedTrends: activities.filter(a => a.activityType === 'trend').map(transformActivityToOldFormat),
+        savedIdeas: activities.filter(a => a.activityType === 'idea').map(transformActivityToOldFormat),
+        savedPRs: activities.filter(a => a.activityType === 'pr').map(transformActivityToOldFormat)
+      };
       
       setClient(clientInfo);
-      setActivity({
-        savedTrends: clientActivity.savedTrends || [],
-        savedIdeas: clientActivity.savedIdeas || [],
-        savedPRs: clientActivity.savedPRs || []
-      });
+      setActivity(organizedActivity);
       setLoading(false);
     } catch (error) {
       console.error('Error loading client activity:', error);
@@ -49,12 +64,48 @@ export default function ClientActivity() {
     }
   };
 
-  const removeFromActivity = (type, itemId) => {
+  // Transform database activity format to match the old localStorage format
+  const transformActivityToOldFormat = (dbActivity) => {
+    const content = dbActivity.content || {};
+    return {
+      id: dbActivity.id.toString(),
+      title: dbActivity.title || content.headline || content.title,
+      headline: content.headline || dbActivity.title,
+      summary: content.summary || content.description || '',
+      description: content.description || content.summary || '',
+      content: content.content || content.draft || '',
+      sources: content.sources || [],
+      campaignType: content.campaignType || '',
+      clientData: content.clientData || {},
+      context: content.context || '',
+      notes: dbActivity.notes || '',
+      savedAt: dbActivity.createdAt,
+      relevanceScore: content.relevanceScore || 7,
+      clientId: dbActivity.clientId,
+      clientName: dbActivity.clientName || client?.name
+    };
+  };
+
+  const removeFromActivity = async (type, itemId) => {
     if (!confirm('Are you sure you want to remove this item from client activity?')) {
       return;
     }
 
     try {
+      // Delete from database
+      const response = await fetch('/api/client-activities', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: parseInt(itemId) })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete activity');
+      }
+
+      // Update local state
       const updatedActivity = { ...activity };
       
       if (type === 'trends') {
@@ -65,10 +116,7 @@ export default function ClientActivity() {
         updatedActivity.savedPRs = updatedActivity.savedPRs.filter(item => item.id !== itemId);
       }
 
-      // Save back to localStorage
-      localStorage.setItem(`client_${client.id}_activity`, JSON.stringify(updatedActivity));
       setActivity(updatedActivity);
-      
       alert('✅ Item removed from client activity');
     } catch (error) {
       console.error('Error removing from activity:', error);

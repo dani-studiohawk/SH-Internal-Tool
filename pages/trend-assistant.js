@@ -140,7 +140,7 @@ export default function TrendAssistant() {
     router.push(`/trend-detail?trendId=${trend.id}&clientId=${clientKey}&returnToResults=true`);
   };
 
-  const saveToClientActivity = (item, type) => {
+  const saveToClientActivity = async (item, type) => {
     if (clients.length === 0) {
       alert('No clients available. Please add clients first.');
       return;
@@ -165,34 +165,33 @@ export default function TrendAssistant() {
     const notes = prompt(`Add notes for this ${type} (optional):`, '');
 
     try {
-      // Get existing client activity
-      const existingActivity = JSON.parse(localStorage.getItem(`client_${selectedClientId}_activity`) || '{}');
-      
-      // Initialize arrays if they don't exist
-      if (!existingActivity.savedTrends) existingActivity.savedTrends = [];
-      if (!existingActivity.savedIdeas) existingActivity.savedIdeas = [];
-      if (!existingActivity.savedPRs) existingActivity.savedPRs = [];
-
-      // Add the item to appropriate array
-      const savedItem = {
-        ...item,
-        savedAt: new Date().toISOString(),
-        notes: notes || '',
-        clientId: selectedClientId,
-        clientName: client.name
+      // Prepare the activity data for the API
+      const activityData = {
+        clientId: parseInt(selectedClientId),
+        activityType: 'trend',
+        title: item.title,
+        content: {
+          ...item,
+          clientId: selectedClientId,
+          clientName: client.name
+        },
+        notes: notes || ''
       };
 
-      if (type === 'trend') {
-        existingActivity.savedTrends.unshift(savedItem); // Add to beginning
-      } else if (type === 'idea') {
-        existingActivity.savedIdeas.unshift(savedItem);
-      } else if (type === 'pr') {
-        existingActivity.savedPRs.unshift(savedItem);
+      // Save to database via API
+      const response = await fetch('/api/client-activities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(activityData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save to client activity');
       }
 
-      // Save back to localStorage
-      localStorage.setItem(`client_${selectedClientId}_activity`, JSON.stringify(existingActivity));
-
+      const savedActivity = await response.json();
       alert(`✅ ${type.charAt(0).toUpperCase() + type.slice(1)} saved to ${client.name}'s activity!${notes ? `\n\nNotes: ${notes}` : ''}`);
     } catch (error) {
       console.error('Error saving to client activity:', error);

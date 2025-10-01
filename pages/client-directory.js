@@ -9,7 +9,7 @@ export default function ClientDirectory() {
   const [formData, setFormData] = useState({
     name: '',
     industry: '',
-    leadDPR: '',
+    leadDpr: '',
     boilerplate: '',
     pressContacts: '',
     url: '',
@@ -20,40 +20,68 @@ export default function ClientDirectory() {
   });
 
   useEffect(() => {
-    const stored = localStorage.getItem('clients');
-    if (stored) {
-      setClients(JSON.parse(stored));
-    }
+    fetchClients();
   }, []);
 
-  const saveClients = (newClients) => {
-    setClients(newClients);
-    localStorage.setItem('clients', JSON.stringify(newClients));
+  const fetchClients = async () => {
+    try {
+      const response = await fetch('/api/clients');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data = await response.json();
+      setClients(data);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      alert('Failed to load clients from database');
+    }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingClient) {
-      const updated = clients.map(c => c.id === editingClient.id ? { ...formData, id: editingClient.id } : c);
-      saveClients(updated);
-      setEditingClient(null);
-    } else {
-      const newClient = { ...formData, id: Date.now() };
-      saveClients([...clients, newClient]);
+  const saveClient = async (clientData) => {
+    try {
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(clientData)
+      });
+      
+      if (!response.ok) throw new Error('Failed to save');
+      
+      const newClient = await response.json();
+      setClients([...clients, newClient]);
+      
+      return newClient;
+    } catch (error) {
+      console.error('Error saving client:', error);
+      alert('Failed to save client to database');
     }
-    setFormData({
-      name: '',
-      industry: '',
-      leadDPR: '',
-      boilerplate: '',
-      pressContacts: '',
-      url: '',
-      toneOfVoice: '',
-      spheres: '',
-      status: 'active',
-      outreachLocations: []
-    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (editingClient) {
+      // Update existing client
+      const response = await fetch('/api/clients', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, id: editingClient.id })
+      });
+      
+      if (response.ok) {
+        const updated = await response.json();
+        setClients(clients.map(c => c.id === updated.id ? updated : c));
+      }
+    } else {
+      // Create new client
+      await saveClient(formData);
+    }
+    
     setShowForm(false);
+    setFormData({
+      name: '', industry: '', leadDpr: '', boilerplate: '',
+      pressContacts: '', url: '', toneOfVoice: '', spheres: '',
+      status: 'active', outreachLocations: []
+    });
+    setEditingClient(null);
   };
 
   const editClient = (client) => {
@@ -62,9 +90,23 @@ export default function ClientDirectory() {
     setShowForm(true);
   };
 
-  const deleteClient = (id) => {
-    const filtered = clients.filter(c => c.id !== id);
-    saveClients(filtered);
+  const deleteClient = async (id) => {
+    try {
+      const response = await fetch('/api/clients', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      
+      if (response.ok) {
+        setClients(clients.filter(c => c.id !== id));
+      } else {
+        alert('Failed to delete client from database');
+      }
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      alert('Failed to delete client from database');
+    }
   };
 
   const getClientActivitySummary = (clientId) => {
@@ -137,8 +179,8 @@ export default function ClientDirectory() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
             <input 
               placeholder="Lead DPR" 
-              value={formData.leadDPR} 
-              onChange={e => setFormData({...formData, leadDPR: e.target.value})} 
+              value={formData.leadDpr} 
+              onChange={e => setFormData({...formData, leadDpr: e.target.value})} 
             />
             <input 
               placeholder="Website URL" 
@@ -240,7 +282,7 @@ export default function ClientDirectory() {
               type="button" 
               className="secondary"
               onClick={() => {setShowForm(false); setEditingClient(null); setFormData({
-                name: '', industry: '', leadDPR: '', boilerplate: '', 
+                name: '', industry: '', leadDpr: '', boilerplate: '', 
                 pressContacts: '', url: '', toneOfVoice: '', spheres: '', status: 'active',
                 outreachLocations: []
               });}}
@@ -284,9 +326,9 @@ export default function ClientDirectory() {
                 </p>
               )}
               
-              {client.leadDPR && (
+              {client.leadDpr && (
                 <p className="text-sm text-muted" style={{ marginBottom: '0.5rem' }}>
-                  <strong>Lead DPR:</strong> {client.leadDPR}
+                  <strong>Lead DPR:</strong> {client.leadDpr}
                 </p>
               )}
               

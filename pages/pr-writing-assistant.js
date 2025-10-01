@@ -28,35 +28,38 @@ export default function PRWritingAssistant() {
     }
   };
 
-  const saveToClientActivity = (clientId, activityData) => {
+  const saveToClientActivity = async (clientId, activityData) => {
     try {
-      // Get existing client activity using the same pattern as other tools
-      const existingActivity = JSON.parse(localStorage.getItem(`client_${clientId}_activity`) || '{}');
-      
-      // Initialize arrays if they don't exist
-      if (!existingActivity.savedTrends) existingActivity.savedTrends = [];
-      if (!existingActivity.savedIdeas) existingActivity.savedIdeas = [];
-      if (!existingActivity.savedPRs) existingActivity.savedPRs = [];
-
-      // Create the press release activity
-      const prActivity = {
-        id: Date.now().toString(),
-        headline: activityData.headline || 'Press Release Draft',
-        summary: activityData.summary || '',
-        content: activityData.draft || '',
-        campaignType: activityData.campaignType || '',
-        sources: activityData.sources || [],
-        savedAt: new Date().toISOString(),
-        notes: '' // Can be extended later
+      // Prepare the activity data for the API
+      const apiData = {
+        clientId: parseInt(clientId),
+        activityType: 'pr',
+        title: activityData.headline || 'Press Release Draft',
+        content: {
+          headline: activityData.headline || 'Press Release Draft',
+          summary: activityData.summary || '',
+          content: activityData.draft || '',
+          campaignType: activityData.campaignType || '',
+          sources: activityData.sources || []
+        },
+        notes: ''
       };
-      
-      // Add to savedPRs array
-      existingActivity.savedPRs.push(prActivity);
-      
-      // Save back to localStorage
-      localStorage.setItem(`client_${clientId}_activity`, JSON.stringify(existingActivity));
-      
-      return prActivity.id;
+
+      // Save to database via API
+      const response = await fetch('/api/client-activities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save to client activity');
+      }
+
+      const savedActivity = await response.json();
+      return savedActivity.id.toString();
     } catch (error) {
       console.error('Error saving to client activity:', error);
       throw error;
@@ -214,7 +217,7 @@ export default function PRWritingAssistant() {
     }
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     if (!draft) {
       alert('No press release content to save!');
       return;
@@ -245,7 +248,7 @@ export default function PRWritingAssistant() {
     }
 
     try {
-      const activityId = saveToClientActivity(selectedClientId, {
+      const activityId = await saveToClientActivity(selectedClientId, {
         headline,
         summary,
         draft,
