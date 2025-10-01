@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   const selectedCountry = validCountries.includes(country) ? country : 'au';
 
   try {
-    const apiKey = 'b747f4ded0bc7bd0eceffc4a073baae2';
+    const apiKey = process.env.GNEWS_API_KEY;
     const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(keyword)}&lang=en&country=${selectedCountry}&max=10&apikey=${apiKey}`;
 
     console.log('Fetching news articles for keyword:', keyword, 'from country:', selectedCountry);

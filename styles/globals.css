@@ -4,6 +4,24 @@
   padding: 0;
 }
 
+html {
+  font-size: 16px; /* Base font size */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-size: 1rem; /* 16px */
+  line-height: 1.5;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f7fafc;
+  color: var(--text-primary);
+}
+
 :root {
   --primary-color: #0a0a0a;
   --primary-light: #1a1a1a;
@@ -23,16 +41,6 @@
   --shadow-cyan: 0 4px 20px rgba(0, 201, 255, 0.15);
   --border-radius: 12px;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f7fafc;
-  color: var(--text-primary);
-  line-height: 1.6;
 }
 
 code {
@@ -79,14 +87,17 @@ code {
   z-index: 1;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(0, 201, 255, 0.1);
+  font-size: 1rem; /* Reset to base size */
+  max-width: 100%;
+  height: calc(100vh - 2rem); /* Account for margins */
 }
 
 /* Typography */
 h1 {
-  font-size: 2.25rem;
+  font-size: 1.75rem; /* Reduced from 2.25rem */
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem; /* Reduced from 1.5rem */
   line-height: 1.2;
   position: relative;
 }
@@ -103,23 +114,23 @@ h1::after {
 }
 
 h2 {
-  font-size: 1.875rem;
+  font-size: 1.5rem; /* Reduced from 1.875rem */
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem; /* Reduced from 1rem */
 }
 
 h3 {
-  font-size: 1.5rem;
+  font-size: 1.25rem; /* Reduced from 1.5rem */
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem; /* Reduced from 0.75rem */
 }
 
 p {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem; /* Reduced from 1rem */
   color: var(--text-secondary);
-  font-size: 1.1rem;
+  font-size: 0.95rem; /* Reduced from 1.1rem */
 }
 
 /* Button Styles */
@@ -127,9 +138,9 @@ button {
   background-color: var(--accent-color);
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.6rem 1.25rem; /* Reduced from 0.75rem 1.5rem */
   border-radius: var(--border-radius);
-  font-size: 0.95rem;
+  font-size: 0.9rem; /* Reduced from 0.95rem */
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -199,13 +210,13 @@ form {
 
 input, textarea, select {
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.6rem; /* Reduced from 0.75rem */
   border: 2px solid var(--border-color);
   border-radius: var(--border-radius);
-  font-size: 1rem;
+  font-size: 0.9rem; /* Reduced from 1rem */
   font-family: inherit;
   transition: var(--transition);
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem; /* Reduced from 1rem */
   background-color: white;
 }
 
@@ -225,7 +236,7 @@ textarea {
 .card {
   background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
   border-radius: var(--border-radius);
-  padding: 1.5rem;
+  padding: 1.25rem; /* Reduced from 1.5rem */
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
   transition: var(--transition);
@@ -478,4 +489,18 @@ textarea {
 
 .progress-dot:nth-child(3) {
   animation-delay: 0.6s;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 14px; /* Smaller base on mobile */
+  }
+  
+  .main-content {
+    padding: 1rem; /* Reduced from 2rem */
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
 }

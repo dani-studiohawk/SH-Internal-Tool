@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0051cc;
+        }
+        textarea, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 API Test Dashboard</h1>
+    
+    <div class="container">
+        <h2>📋 Clients API</h2>
+        
+        <div>
+            <button onclick="getAllClients()">GET All Clients</button>
+            <button onclick="createTestClient()">POST Create Test Client</button>
+        </div>
+        
+        <div>
+            <h3>Create Custom Client</h3>
+            <input type="text" id="clientName" placeholder="Client Name" value="Studio Hawk">
+            <input type="text" id="clientIndustry" placeholder="Industry" value="Digital Marketing">
+            <input type="text" id="clientStatus" placeholder="Status" value="active">
+            <button onclick="createCustomClient()">Create Client</button>
+        </div>
+        
+        <div>
+            <h3>Update Client</h3>
+            <input type="number" id="updateClientId" placeholder="Client ID">
+            <input type="text" id="updateField" placeholder="Industry" value="SEO & Content Marketing">
+            <button onclick="updateClient()">Update Client Industry</button>
+        </div>
+        
+        <div id="clientResult" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>📝 Client Activities API</h2>
+        
+        <div>
+            <button onclick="getAllActivities()">GET All Activities</button>
+        </div>
+        
+        <div>
+            <h3>Create Activity</h3>
+            <input type="number" id="activityClientId" placeholder="Client ID">
+            <select id="activityType">
+                <option value="trend">Trend</option>
+                <option value="idea">Idea</option>
+                <option value="pr">Press Release</option>
+            </select>
+            <input type="text" id="activityTitle" placeholder="Activity Title" value="Q4 Content Strategy">
+            <textarea id="activityContent" placeholder="Content (JSON)" rows="3">{"priority": "high", "deadline": "2025-10-15"}</textarea>
+            <textarea id="activityNotes" placeholder="Notes" rows="2">Planning content strategy for Q4 campaign</textarea>
+            <button onclick="createActivity()">Create Activity</button>
+        </div>
+        
+        <div id="activityResult" class="result"></div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3000/api';
+
+        async function makeRequest(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${BASE_URL}${endpoint}`, options);
+                const result = await response.json();
+                
+                return {
+                    status: response.status,
+                    data: result,
+                    success: response.ok
+                };
+            } catch (error) {
+                return {
+                    status: 0,
+                    data: { error: error.message },
+                    success: false
+                };
+            }
+        }
+
+        function displayResult(elementId, response) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${response.success ? 'success' : 'error'}`;
+            element.textContent = `Status: ${response.status}\n\n${JSON.stringify(response.data, null, 2)}`;
+        }
+
+        // Client API functions
+        async function getAllClients() {
+            const response = await makeRequest('/clients');
+            displayResult('clientResult', response);
+        }
+
+        async function createTestClient() {
+            const clientData = {
+                name: 'API Test Client',
+                industry: 'Technology',
+                leadDpr: 'John Smith',
+                status: 'active',
+                outreachLocations: ['Sydney', 'Melbourne']
+            };
+            
+            const response = await makeRequest('/clients', 'POST', clientData);
+            displayResult('clientResult', response);
+        }
+
+        async function createCustomClient() {
+            const clientData = {
+                name: document.getElementById('clientName').value,
+                industry: document.getElementById('clientIndustry').value,
+                status: document.getElementById('clientStatus').value
+            };
+            
+            const response = await makeRequest('/clients', 'POST', clientData);
+            displayResult('clientResult', response);
+        }
+
+        async function updateClient() {
+            const updateData = {
+                id: parseInt(document.getElementById('updateClientId').value),
+                industry: document.getElementById('updateField').value
+            };
+            
+            const response = await makeRequest('/clients', 'PUT', updateData);
+            displayResult('clientResult', response);
+        }
+
+        // Activity API functions
+        async function getAllActivities() {
+            const response = await makeRequest('/client-activities');
+            displayResult('activityResult', response);
+        }
+
+        async function createActivity() {
+            let content;
+            try {
+                content = JSON.parse(document.getElementById('activityContent').value);
+            } catch (e) {
+                content = { raw: document.getElementById('activityContent').value };
+            }
+            
+            const activityData = {
+                clientId: parseInt(document.getElementById('activityClientId').value),
+                activityType: document.getElementById('activityType').value,
+                title: document.getElementById('activityTitle').value,
+                content: content,
+                notes: document.getElementById('activityNotes').value
+            };
+            
+            const response = await makeRequest('/client-activities', 'POST', activityData);
+            displayResult('activityResult', response);
+        }
+
+        // Load initial data
+        window.onload = function() {
+            getAllClients();
+        };
+    </script>
+</body>
+</html>
