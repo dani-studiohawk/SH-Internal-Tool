@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getClients, createClient, updateClient, deleteClient } from '../lib/api';
 
 export default function ClientDirectory() {
-  const [clients, setClients] = useState([]);
+  // React Query client for cache management
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  
+  // Component state (preserved from original)
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
     industry: '',
@@ -19,93 +24,117 @@ export default function ClientDirectory() {
     outreachLocations: []
   });
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
+  // React Query: Fetch clients with automatic caching and refetching
+  const {
+    data: clients = [],
+    isLoading,
+    isError,
+    error
+  } = useQuery({
+    queryKey: ['clients'],
+    queryFn: getClients,
+    // Additional options can be set here to override defaults
+  });
 
-  const fetchClients = async () => {
-    try {
-      const response = await fetch('/api/clients');
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      setClients(data);
-    } catch (error) {
-      console.error('Error loading clients:', error);
-      alert('Failed to load clients from database');
-    }
-  };
-
-  const saveClient = async (clientData) => {
-    try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clientData)
+  // React Query: Create client mutation with optimistic updates
+  const createClientMutation = useMutation({
+    mutationFn: createClient,
+    onSuccess: (newClient) => {
+      // Optimistically update the cache with the new client
+      queryClient.setQueryData(['clients'], (oldClients) => {
+        return oldClients ? [...oldClients, newClient] : [newClient];
       });
       
-      if (!response.ok) throw new Error('Failed to save');
-      
-      const newClient = await response.json();
-      setClients([...clients, newClient]);
-      
-      return newClient;
-    } catch (error) {
-      console.error('Error saving client:', error);
-      alert('Failed to save client to database');
+      // Also invalidate to ensure we have the latest data from server
+      queryClient.invalidateQueries(['clients']);
+    },
+    onError: (error) => {
+      // Show user-friendly error message
+      alert(`Failed to create client: ${error.message}`);
     }
-  };
+  });
 
+  // React Query: Update client mutation with optimistic updates
+  const updateClientMutation = useMutation({
+    mutationFn: updateClient,
+    onSuccess: (updatedClient) => {
+      // Optimistically update the cache with the updated client
+      queryClient.setQueryData(['clients'], (oldClients) => {
+        return oldClients ? oldClients.map(client => 
+          client.id === updatedClient.id ? updatedClient : client
+        ) : [updatedClient];
+      });
+      
+      // Invalidate to ensure cache consistency
+      queryClient.invalidateQueries(['clients']);
+    },
+    onError: (error) => {
+      alert(`Failed to update client: ${error.message}`);
+    }
+  });
+
+  // React Query: Delete client mutation with optimistic updates
+  const deleteClientMutation = useMutation({
+    mutationFn: deleteClient,
+    onSuccess: (_, deletedClientId) => {
+      // Optimistically remove the client from cache
+      queryClient.setQueryData(['clients'], (oldClients) => {
+        return oldClients ? oldClients.filter(client => client.id !== deletedClientId) : [];
+      });
+      
+      // Invalidate to ensure cache consistency
+      queryClient.invalidateQueries(['clients']);
+    },
+    onError: (error) => {
+      alert(`Failed to delete client: ${error.message}`);
+    }
+  });
+
+  // Form submission handler - updated to use mutations
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (editingClient) {
-      // Update existing client
-      const response = await fetch('/api/clients', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, id: editingClient.id })
-      });
-      
-      if (response.ok) {
-        const updated = await response.json();
-        setClients(clients.map(c => c.id === updated.id ? updated : c));
+    try {
+      if (editingClient) {
+        // Update existing client using React Query mutation
+        await updateClientMutation.mutateAsync({ ...formData, id: editingClient.id });
+      } else {
+        // Create new client using React Query mutation
+        await createClientMutation.mutateAsync(formData);
       }
-    } else {
-      // Create new client
-      await saveClient(formData);
+      
+      // Reset form state on success
+      setShowForm(false);
+      setFormData({
+        name: '', industry: '', leadDpr: '', boilerplate: '',
+        pressContacts: '', url: '', toneOfVoice: '', spheres: '',
+        status: 'active', outreachLocations: []
+      });
+      setEditingClient(null);
+    } catch (error) {
+      // Error handling is done in the mutation's onError callback
+      console.error('Form submission error:', error);
     }
-    
-    setShowForm(false);
-    setFormData({
-      name: '', industry: '', leadDpr: '', boilerplate: '',
-      pressContacts: '', url: '', toneOfVoice: '', spheres: '',
-      status: 'active', outreachLocations: []
-    });
-    setEditingClient(null);
   };
 
+  // Edit client handler (unchanged)
   const editClient = (client) => {
     setFormData({ ...client, outreachLocations: client.outreachLocations || [] });
     setEditingClient(client);
     setShowForm(true);
   };
 
-  const deleteClient = async (id) => {
+  // Delete client handler - updated to use mutation
+  const handleDeleteClient = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this client? This action cannot be undone.')) {
+      return;
+    }
+    
     try {
-      const response = await fetch('/api/clients', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
-      
-      if (response.ok) {
-        setClients(clients.filter(c => c.id !== id));
-      } else {
-        alert('Failed to delete client from database');
-      }
+      await deleteClientMutation.mutateAsync(id);
     } catch (error) {
-      console.error('Error deleting client:', error);
-      alert('Failed to delete client from database');
+      // Error handling is done in the mutation's onError callback
+      console.error('Delete client error:', error);
     }
   };
 
@@ -146,6 +175,57 @@ export default function ClientDirectory() {
     return `${Math.ceil(diffDays / 30)} months ago`;
   };
 
+  // Show loading state with a proper loading UI
+  if (isLoading) {
+    return (
+      <div>
+        <div className="flex-between mb-4">
+          <div>
+            <h1>Client Directory</h1>
+            <p className="text-muted">Manage your client information and project details</p>
+          </div>
+          <button disabled style={{ opacity: 0.6 }}>
+            ✨ Add New Client
+          </button>
+        </div>
+        
+        <div className="card text-center" style={{ padding: '3rem', marginTop: '2rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+          <h3>Loading clients...</h3>
+          <p className="text-muted">Please wait while we fetch your client information</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry option
+  if (isError) {
+    return (
+      <div>
+        <div className="flex-between mb-4">
+          <div>
+            <h1>Client Directory</h1>
+            <p className="text-muted">Manage your client information and project details</p>
+          </div>
+          <button disabled style={{ opacity: 0.6 }}>
+            ✨ Add New Client
+          </button>
+        </div>
+        
+        <div className="card text-center" style={{ padding: '3rem', marginTop: '2rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+          <h3>Failed to load clients</h3>
+          <p className="text-muted" style={{ marginBottom: '1rem' }}>
+            {error?.message || 'There was an error loading your client data'}
+          </p>
+          <button onClick={() => queryClient.invalidateQueries(['clients'])}>
+            🔄 Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex-between mb-4">
@@ -153,8 +233,12 @@ export default function ClientDirectory() {
           <h1>Client Directory</h1>
           <p className="text-muted">Manage your client information and project details</p>
         </div>
-        <button onClick={() => setShowForm(true)}>
-          ✨ Add New Client
+        <button 
+          onClick={() => setShowForm(true)}
+          disabled={createClientMutation.isLoading}
+          style={{ opacity: createClientMutation.isLoading ? 0.6 : 1 }}
+        >
+          {createClientMutation.isLoading ? '⏳ Adding...' : '✨ Add New Client'}
         </button>
       </div>
 
@@ -275,12 +359,22 @@ export default function ClientDirectory() {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <button type="submit">
-              {editingClient ? '💾 Update Client' : '✨ Add Client'}
+            <button 
+              type="submit"
+              disabled={createClientMutation.isLoading || updateClientMutation.isLoading}
+              style={{ 
+                opacity: (createClientMutation.isLoading || updateClientMutation.isLoading) ? 0.6 : 1 
+              }}
+            >
+              {editingClient 
+                ? (updateClientMutation.isLoading ? '⏳ Updating...' : '💾 Update Client')
+                : (createClientMutation.isLoading ? '⏳ Adding...' : '✨ Add Client')
+              }
             </button>
             <button 
               type="button" 
               className="secondary"
+              disabled={createClientMutation.isLoading || updateClientMutation.isLoading}
               onClick={() => {setShowForm(false); setEditingClient(null); setFormData({
                 name: '', industry: '', leadDpr: '', boilerplate: '', 
                 pressContacts: '', url: '', toneOfVoice: '', spheres: '', status: 'active',
@@ -426,11 +520,16 @@ export default function ClientDirectory() {
                   ✏️ Edit
                 </button>
                 <button 
-                  onClick={() => deleteClient(client.id)}
+                  onClick={() => handleDeleteClient(client.id)}
                   className="danger"
-                  style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}
+                  disabled={deleteClientMutation.isLoading}
+                  style={{ 
+                    padding: '0.75rem 1rem', 
+                    fontSize: '0.875rem',
+                    opacity: deleteClientMutation.isLoading ? 0.6 : 1
+                  }}
                 >
-                  🗑️
+                  {deleteClientMutation.isLoading ? '⏳' : '🗑️'}
                 </button>
               </div>
             </div>
