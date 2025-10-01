@@ -1,10 +1,12 @@
 import '../styles/globals.css';
 import Sidebar from '../components/Sidebar';
+import AuthGuard from '../components/AuthGuard';
 import Head from 'next/head';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { SessionProvider } from 'next-auth/react';
 
-export default function App({ Component, pageProps }) {
+export default function App({ Component, pageProps: { session, ...pageProps } }) {
   // Create a new QueryClient instance for each app render
   // This ensures server-side rendering works correctly
   const [queryClient] = useState(() => new QueryClient({
@@ -23,16 +25,21 @@ export default function App({ Component, pageProps }) {
   }));
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Head>
-        <title>Studio Hawk - Internal Tool</title>
-      </Head>
-      <div className="layout">
-        <Sidebar />
-        <div className="main-content">
-          <Component {...pageProps} />
-        </div>
-      </div>
-    </QueryClientProvider>
+    <SessionProvider session={session}>
+      <QueryClientProvider client={queryClient}>
+        <Head>
+          <title>Studio Hawk - Internal Tool</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+        </Head>
+        <AuthGuard>
+          <div className="layout">
+            <Sidebar />
+            <div className="main-content">
+              <Component {...pageProps} />
+            </div>
+          </div>
+        </AuthGuard>
+      </QueryClientProvider>
+    </SessionProvider>
   );
 }

@@ -1,3 +1,4 @@
+const { withAuth } = require('../../lib/auth-middleware');
 const { neon } = require('@neondatabase/serverless');
 
 // Initialize database connection
@@ -52,7 +53,10 @@ function validateActivityData(data, isUpdate = false) {
   return errors;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  // User session is available in req.session (provided by withAuth)
+  console.log(`API accessed by user: ${req.session.user.email}`);
+
   // Check database connection
   if (!process.env.DATABASE_URL) {
     console.error('DATABASE_URL environment variable is not set');
@@ -290,3 +294,6 @@ async function handleDelete(req, res) {
     return res.status(500).json({ error: 'Failed to delete activity' });
   }
 }
+
+// Export the handler wrapped with authentication
+export default withAuth(handler);

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 
 export default function Dashboard() {
   const [clientCount, setClientCount] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const { data: session } = useSession();
   const router = useRouter();
 
   useEffect(() => {
@@ -37,11 +39,43 @@ export default function Dashboard() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getFirstName = (fullName) => {
+    return fullName ? fullName.split(' ')[0] : 'there';
+  };
+
   return (
     <div>
+      {/* Welcome Banner */}
+      {session && (
+        <div className="welcome-banner">
+          <div className="welcome-content">
+            <h1 className="welcome-title">
+              {getGreeting()}, {getFirstName(session.user.name)}! 👋
+            </h1>
+            <p className="welcome-subtitle">
+              Welcome back to your Studio Hawk dashboard. Ready to create something amazing today?
+            </p>
+          </div>
+          {session.user.image && (
+            <img 
+              src={session.user.image} 
+              alt={session.user.name}
+              className="welcome-avatar"
+            />
+          )}
+        </div>
+      )}
+
       <div className="flex-between mb-4">
         <div>
-          <h1>Welcome to Studio Hawk</h1>
+          <h1>Studio Hawk Dashboard</h1>
           <p className="text-muted">Your comprehensive internal tool for client management and content creation</p>
         </div>
         <div className="text-sm text-muted">

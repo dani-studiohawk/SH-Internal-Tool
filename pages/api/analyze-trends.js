@@ -1,10 +1,14 @@
+const { withAuth } = require('../../lib/auth-middleware');
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  // User session is available in req.session (provided by withAuth)
+  console.log(`API accessed by user: ${req.session.user.email}`);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -107,3 +111,6 @@ Example format:
     res.status(500).json({ error: `Failed to analyze trends: ${error.message}` });
   }
 }
+
+// Export the handler wrapped with authentication
+export default withAuth(handler);

@@ -1,4 +1,8 @@
-export default async function handler(req, res) {
+const { withAuth } = require('../../lib/auth-middleware');
+async function handler(req, res) {
+  // User session is available in req.session (provided by withAuth)
+  console.log(`API accessed by user: ${req.session.user.email}`);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -45,3 +49,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: `Failed to fetch news articles: ${error.message}` });
   }
 }
+
+// Export the handler wrapped with authentication
+export default withAuth(handler);

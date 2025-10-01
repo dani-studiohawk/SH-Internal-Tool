@@ -1,8 +1,12 @@
+const { withAuth } = require('../../lib/auth-middleware');
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL);
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  // User session is available in req.session (provided by withAuth)
+  console.log(`API accessed by user: ${req.session.user.email}`);
+
   if (req.method === 'GET') {
     try {
       const ideas = await sql`
@@ -111,3 +115,6 @@ export default async function handler(req, res) {
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }
+
+// Export the handler wrapped with authentication
+export default withAuth(handler);
