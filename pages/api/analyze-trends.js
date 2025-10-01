@@ -34,15 +34,14 @@ ${articlesText}
 Please identify 3-5 key trends that can be inferred from these articles. For each trend, provide:
 - Trend title
 - Brief description  
-- Market impact or relevance
-- Relevance score (1-10, where 10 is highly relevant)
+- Relevance score (1-10, where 1 is irrelevant and 10 is highly relevant)
 
 Only include trends that are actually supported by the articles. Discard any irrelevant or unrelated content.
 
 IMPORTANT: Respond with ONLY a valid JSON array. Do not include any explanations, markdown formatting, or additional text. The response must be parseable as JSON.
 
 Example format:
-[{"title": "Trend Title", "description": "Brief description", "impact": "Market impact", "relevanceScore": 8}]`;
+[{"title": "Trend Title", "description": "Brief description", "relevanceScore": 8}]`;
 
     console.log('Sending prompt to OpenAI for keyword:', keyword);
     const completion = await openai.chat.completions.create({
@@ -50,7 +49,7 @@ Example format:
       messages: [
         { 
           role: 'system', 
-          content: 'You are a market research analyst specializing in identifying trends from news articles. You must respond with ONLY valid JSON. No explanations, no markdown, just pure JSON.' 
+          content: 'You are a Digital PR analyst specializing in identifying trends from news articles. You must respond with ONLY valid JSON. No explanations, no markdown, just pure JSON.' 
         },
         { role: 'user', content: prompt }
       ],

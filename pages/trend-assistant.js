@@ -423,16 +423,6 @@ export default function TrendAssistant() {
                   <p style={{ margin: '0 0 1rem 0', lineHeight: '1.6' }}>
                     {trend.description}
                   </p>
-
-                  <div style={{ 
-                    backgroundColor: 'rgba(0, 201, 255, 0.1)', 
-                    padding: '1rem', 
-                    borderRadius: 'var(--border-radius)',
-                    marginBottom: '1rem'
-                  }}>
-                    <strong style={{ color: 'var(--primary-color)' }}>Market Impact:</strong>
-                    <div style={{ marginTop: '0.5rem' }}>{trend.impact}</div>
-                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
