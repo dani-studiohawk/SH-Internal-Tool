@@ -1,5 +1,7 @@
 const { withAuth } = require('../../lib/auth-middleware');
-const { applyRateLimit } = require('../../lib/rate-limit');
+const { applyAIRateLimit } = require('../../lib/rate-limit');
+const { withErrorHandler, handleApiError } = require('../../lib/error-handler');
+const { validateRequestSize } = require('../../lib/validation');
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -7,18 +9,17 @@ const openai = new OpenAI({
 });
 
 async function handler(req, res) {
+  return applyAIRateLimit(req, res, async () => {
+    await handleRequest(req, res);
+  });
+}
+
+async function handleRequest(req, res) {
+  // Validate request size
+  validateRequestSize(req, res, () => {});
+
   // User session is available in req.session (provided by withAuth)
   console.log(`API accessed by user: ${req.session.user.email}`);
-
-  // Apply rate limiting for expensive AI operations
-  await new Promise((resolve, reject) => {
-    applyRateLimit(req, res, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  }).catch(() => {
-    return; // Rate limit response already sent
-  });
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -150,10 +151,9 @@ JSON format:
     }
 
   } catch (error) {
-    console.error('Error generating headlines:', error);
-    res.status(500).json({ error: 'Failed to generate headlines' });
+    handleApiError(error, req, res, 'Generate Headlines');
   }
 }
 
-// Export the handler wrapped with authentication
-export default withAuth(handler);
+// Export the handler wrapped with authentication and error handling
+export default withAuth(withErrorHandler(handler));

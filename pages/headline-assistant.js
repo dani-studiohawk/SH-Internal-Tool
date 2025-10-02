@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { secureRetrieve } from '../lib/secure-storage';
 
 export default function HeadlineAssistant() {
   const [headlines, setHeadlines] = useState([]);
@@ -10,9 +11,9 @@ export default function HeadlineAssistant() {
 
   useEffect(() => {
     // Load clients for optional client-specific headlines
-    const stored = localStorage.getItem('clients');
+    const stored = secureRetrieve('clients');
     if (stored) {
-      setClients(JSON.parse(stored));
+      setClients(stored);
     }
   }, []);
 

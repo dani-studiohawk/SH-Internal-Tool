@@ -1,7 +1,8 @@
 const { withAuth } = require('../../lib/auth-middleware');
 const { neon } = require('@neondatabase/serverless');
-const { validateClientActivityContent, sanitizeContent } = require('../../lib/validation');
-const { createUserRateLimit } = require('../../lib/rate-limit');
+const { validateClientActivityContent, sanitizeContent, validateRequestSize } = require('../../lib/validation');
+const { applyReadRateLimit, applyWriteRateLimit } = require('../../lib/rate-limit');
+const { withErrorHandler, handleDatabaseError } = require('../../lib/error-handler');
 
 // Initialize database connection
 const sql = neon(process.env.DATABASE_URL);
@@ -62,19 +63,20 @@ function validateActivityData(data, isUpdate = false) {
 }
 
 async function handler(req, res) {
+  // Apply rate limiting based on method
+  const rateLimitHandler = req.method === 'GET' ? applyReadRateLimit : applyWriteRateLimit;
+  
+  return rateLimitHandler(req, res, async () => {
+    await handleRequest(req, res);
+  });
+}
+
+async function handleRequest(req, res) {
+  // Validate request size
+  validateRequestSize(req, res, () => {});
+
   // User session is available in req.session (provided by withAuth)
   console.log(`API accessed by user: ${req.session.user.email}`);
-
-  // Apply user-based rate limiting (30 requests per 15 minutes for this endpoint)
-  const userRateLimit = createUserRateLimit(30);
-  await new Promise((resolve, reject) => {
-    userRateLimit(req, res, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  }).catch(() => {
-    return; // Rate limit response already sent
-  });
 
   // Check database connection
   if (!process.env.DATABASE_URL) {

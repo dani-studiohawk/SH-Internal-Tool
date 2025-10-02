@@ -37,22 +37,8 @@ export default function TrendDetail() {
       console.error('Error loading from database:', error);
     }
 
-    // Fallback to localStorage
-    const storedTrends = localStorage.getItem(`trends_${clientId}`);
-    const storedArticles = localStorage.getItem(`articles_${clientId}`);
-    const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
-
-    if (storedTrends && storedArticles) {
-      const trends = JSON.parse(storedTrends);
-      const articlesData = JSON.parse(storedArticles);
-
-      const foundTrend = trends.find(t => t.id == trendId);
-      if (foundTrend) {
-        setTrend(foundTrend);
-        setArticles(articlesData);
-        setKeyword(storedKeyword || '');
-      }
-    }
+    // Legacy localStorage fallback removed for security reasons
+    // Data should be loaded from database only
     setLoading(false);
   };
 
@@ -164,10 +150,8 @@ export default function TrendDetail() {
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem' }}>
         <button 
           onClick={() => {
-            // Store trend data for ideation assistant
-            localStorage.setItem('trendData', JSON.stringify(trend));
-            // Navigate to ideation assistant
-            router.push('/ideation-assistant');
+            // Navigate to ideation assistant with trend data in URL params
+            router.push(`/ideation-assistant?trendId=${trend.id}&trendData=${encodeURIComponent(JSON.stringify(trend))}`);
           }}
           style={{ flex: 1, padding: '1rem' }}
         >
@@ -193,14 +177,8 @@ export default function TrendDetail() {
               addedAt: new Date().toISOString()
             };
             
-            // Add to existing brief data or create new
-            const existingBrief = localStorage.getItem('briefData');
-            let briefContent = existingBrief ? JSON.parse(existingBrief) : {};
-            
-            briefContent.trendContext = briefData;
-            localStorage.setItem('briefData', JSON.stringify(briefContent));
-            
-            alert(`✅ Trend added to brief!\n\n"${trend.title}"\n\nYou can access it in the PR Writing Assistant.`);
+            // Navigate to PR assistant with trend data in URL params
+            router.push(`/pr-writing-assistant?trendData=${encodeURIComponent(JSON.stringify(briefData))}`);
           }}
           style={{ flex: 1, padding: '1rem' }}
         >

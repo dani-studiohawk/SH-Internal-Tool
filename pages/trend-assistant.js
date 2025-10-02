@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { secureRetrieve } from '../lib/secure-storage';
 
 export default function TrendAssistant() {
   const [keyword, setKeyword] = useState('');
@@ -22,9 +23,9 @@ export default function TrendAssistant() {
 
   useEffect(() => {
     // Load clients for optional client association
-    const stored = localStorage.getItem('clients');
+    const stored = secureRetrieve('clients');
     if (stored) {
-      setClients(JSON.parse(stored));
+      setClients(stored);
     }
 
     // Check if coming from a specific client context
@@ -58,17 +59,8 @@ export default function TrendAssistant() {
       console.error('Error loading from database:', error);
     }
 
-    // Fallback to localStorage
-    const storedTrends = localStorage.getItem(`trends_${clientId}`);
-    const storedArticles = localStorage.getItem(`articles_${clientId}`);
-    const storedKeyword = localStorage.getItem(`keyword_${clientId}`);
-
-    if (storedTrends && storedArticles && storedKeyword) {
-      setTrends(JSON.parse(storedTrends));
-      setArticles(JSON.parse(storedArticles));
-      setKeyword(storedKeyword);
-      setStep('results');
-    }
+    // Legacy localStorage fallback removed for security
+    // Data should now be stored securely in database only
   };
 
   const analyzeTrends = async () => {
@@ -156,11 +148,7 @@ export default function TrendAssistant() {
         }
       }
 
-      // Store for trend detail page (fallback and backward compatibility)
-      const clientKey = selectedClient || 'custom';
-      localStorage.setItem(`trends_${clientKey}`, JSON.stringify(trendsWithMetadata));
-      localStorage.setItem(`articles_${clientKey}`, JSON.stringify(articlesToAnalyze));
-      localStorage.setItem(`keyword_${clientKey}`, keyword.trim());
+      // Storage now handled by database only - localStorage removed for security
 
     } catch (error) {
       console.error('Error analyzing trends:', error);
@@ -172,10 +160,8 @@ export default function TrendAssistant() {
   };
 
   const generateIdeasFromTrend = (trend) => {
-    // Store trend data for ideation assistant
-    localStorage.setItem('trendData', JSON.stringify(trend));
-    // Navigate to ideation assistant
-    router.push('/ideation-assistant');
+    // Navigate to ideation assistant with trend data in URL params
+    router.push(`/ideation-assistant?trendId=${trend.id}&trendData=${encodeURIComponent(JSON.stringify(trend))}`);
   };
 
   const viewTrendDetails = (trend) => {

@@ -1,5 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '../../lib/auth-middleware';
+import { applyReadRateLimit, applyWriteRateLimit } from '../../lib/rate-limit';
+import { validateRequestSize, createValidationMiddleware, clientSchema } from '../../lib/validation';
 
 // Initialize database connection
 const sql = neon(process.env.DATABASE_URL);
@@ -63,11 +65,27 @@ function validateClientData(data, isUpdate = false) {
 }
 
 async function handler(req, res) {
+  // Apply rate limiting based on method
+  if (req.method === 'GET') {
+    return applyReadRateLimit(req, res, async () => {
+      await handleRequest(req, res);
+    });
+  } else {
+    return applyWriteRateLimit(req, res, async () => {
+      await handleRequest(req, res);
+    });
+  }
+}
+
+async function handleRequest(req, res) {
   // Check database connection
   if (!process.env.DATABASE_URL) {
     console.error('DATABASE_URL environment variable is not set');
     return res.status(500).json({ error: 'Database configuration error' });
   }
+
+  // Validate request size
+  validateRequestSize(req, res, () => {});
 
   // User session is available in req.session (provided by withAuth)
   console.log(`API accessed by user: ${req.session.user.email}`);

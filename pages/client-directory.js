@@ -232,17 +232,9 @@ export default function ClientDirectory() {
   };
 
   const getClientActivitySummary = (clientId) => {
-    try {
-      const activity = JSON.parse(localStorage.getItem(`client_${clientId}_activity`) || '{}');
-      return {
-        trendsCount: (activity.savedTrends || []).length,
-        ideasCount: (activity.savedIdeas || []).length,
-        prsCount: (activity.savedPRs || []).length,
-        lastActivity: getLastActivityDate(activity)
-      };
-    } catch (error) {
-      return { trendsCount: 0, ideasCount: 0, prsCount: 0, lastActivity: null };
-    }
+    // Activity summary now comes from database - this function is deprecated
+    // TODO: Implement proper activity summary from database API
+    return { trendsCount: 0, ideasCount: 0, prsCount: 0, lastActivity: null };
   };
 
   const getLastActivityDate = (activity) => {

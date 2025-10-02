@@ -142,9 +142,8 @@ export default function IdeationAssistant() {
                selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : ''
     };
 
-    // Store in localStorage and navigate
-    localStorage.setItem('storyData', JSON.stringify(storyData));
-    router.push('/pr-writing-assistant');
+    // Navigate to PR writing assistant with story data in URL params
+    router.push(`/pr-writing-assistant?storyData=${encodeURIComponent(JSON.stringify(storyData))}`);
   };
 
   const saveIdea = async (ideaTitle, ideaSummary, ideaSources) => {
@@ -186,50 +185,13 @@ export default function IdeationAssistant() {
 
       const savedIdea = await response.json();
 
-      // Also save to localStorage for backward compatibility
-      const existingIdeas = JSON.parse(localStorage.getItem('savedIdeas') || '[]');
-      const newIdea = {
-        id: savedIdea.id,
-        ...ideaData,
-        savedAt: savedIdea.savedAt
-      };
-      
-      existingIdeas.unshift(newIdea); // Add to beginning
-      localStorage.setItem('savedIdeas', JSON.stringify(existingIdeas));
-      
       // Show success message
       alert(`✅ Idea saved successfully!\n\n"${ideaTitle}"\n\nYou can access it later in the PR Writing Assistant under "Saved Ideas".`);
     } catch (error) {
       console.error('Error saving idea:', error);
       
-      // Fallback to localStorage only
-      try {
-        const existingIdeas = JSON.parse(localStorage.getItem('savedIdeas') || '[]');
-        const newIdea = {
-          id: Date.now().toString(),
-          headline: ideaTitle,
-          summary: ideaSummary,
-          sources: ideaSources || [],
-          campaignType,
-          clientData: selectionMode === 'client' && selectedClient ? 
-            clients.find(c => c.id == selectedClient) : 
-            (selectionMode === 'trend' && selectedTrend && selectedTrend.clientId && selectedTrend.clientId !== "custom" ?
-            clients.find(c => c.id == selectedTrend.clientId) : null),
-          context: selectionMode === 'client' ? `Client: ${clients.find(c => c.id == selectedClient)?.name}` : 
-                   selectionMode === 'topic' ? `Topic: ${selectedTopic}` : 
-                   selectionMode === 'brief' ? `Brief: ${campaignBrief}` :
-                   selectionMode === 'trend' ? `Trend: ${selectedTrend.title}` : '',
-          savedAt: new Date().toISOString()
-        };
-        
-        existingIdeas.unshift(newIdea);
-        localStorage.setItem('savedIdeas', JSON.stringify(existingIdeas));
-        
-        alert(`⚠️ Idea saved locally only (database unavailable)\n\n"${ideaTitle}"\n\nYou can access it later in the PR Writing Assistant under "Saved Ideas".`);
-      } catch (fallbackError) {
-        console.error('Fallback save failed:', fallbackError);
-        alert('❌ Error saving idea. Please try again.');
-      }
+      // No localStorage fallback for security reasons
+      alert(`⚠️ Unable to save idea - database unavailable. Please try again later.`);
     }
   };
 
